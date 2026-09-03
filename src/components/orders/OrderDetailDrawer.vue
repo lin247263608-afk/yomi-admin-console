@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ArrowRight, CarFront, MapPinned, MessageSquareText, Plus, ReceiptText, UsersRound } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { ArrowRight, CarFront, MapPinned, MessageSquareText, Minus, Plus, ReceiptText, UsersRound } from '@lucide/vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
 import PassengerAddOnSummary from '@/components/orders/PassengerAddOnSummary.vue'
@@ -9,8 +9,11 @@ import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { Order, OrderStatus } from '@/types'
 import { formatCurrency, formatLuggage, formatLondonTime, formatParty } from '@/utils/format'
 
+type TabId = 'overview' | 'passengers' | 'driver' | 'route' | 'messages'
+
 const props = defineProps<{
   order: Order
+  initialTab?: TabId
 }>()
 
 const emit = defineEmits<{
@@ -23,13 +26,15 @@ const emit = defineEmits<{
   openLinkedOrder: [orderId: string]
 }>()
 
-type TabId = 'overview' | 'passengers' | 'driver' | 'route' | 'messages'
-const activeTab = ref<TabId>('overview')
+const activeTab = ref<TabId>(props.initialTab ?? 'overview')
 const noteDraft = ref('')
 const adjustStatusOpen = ref(false)
 const cancelOrderOpen = ref(false)
 const nextStatus = ref<OrderStatus>(props.order.status)
 const operationReason = ref('')
+const routeClock = ref(Date.now())
+const mapZoom = ref(1)
+let routeClockTimer: number | undefined
 
 const tabs: Array<{ id: TabId; label: string; icon: typeof ReceiptText }> = [
   { id: 'overview', label: '订单信息', icon: ReceiptText },
@@ -88,6 +93,38 @@ const refundScopeLabel = computed(() => {
   return record.includesValueAddedServices ? '按订单退款规则 · 含增值服务费' : '按订单退款规则'
 })
 
+const routeTrackPolyline = computed(() =>
+  props.order.routeTelemetry?.driverPoints.map((point) => `${point.x},${point.y}`).join(' ') ?? '',
+)
+
+const latestRoutePoint = computed(() => {
+  const points = props.order.routeTelemetry?.driverPoints ?? []
+  return points.at(-1)
+})
+
+const tripDurationLabel = computed(() => {
+  const startedAt = props.order.routeTelemetry?.trackingStartedAt
+  if (!startedAt) return ''
+  routeClock.value
+  const endedAt = props.order.routeTelemetry?.trackingEndedAt
+  const elapsedSeconds = Math.max(0, Math.floor(((endedAt ? new Date(endedAt).getTime() : Date.now()) - new Date(startedAt).getTime()) / 1000))
+  const hours = Math.floor(elapsedSeconds / 3600)
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60)
+  const seconds = elapsedSeconds % 60
+  const duration = [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':')
+  return `${duration}${endedAt ? '（已结束）' : '（进行中）'}`
+})
+
+onMounted(() => {
+  routeClockTimer = window.setInterval(() => {
+    routeClock.value = Date.now()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (routeClockTimer) window.clearInterval(routeClockTimer)
+})
+
 function submitNote() {
   if (!noteDraft.value.trim()) return
   emit('addNote', noteDraft.value.trim())
@@ -115,6 +152,10 @@ function confirmCancelOrder() {
   if (!operationReason.value.trim()) return
   emit('cancelOrder', operationReason.value.trim())
   cancelOrderOpen.value = false
+}
+
+function changeMapZoom(delta: number) {
+  mapZoom.value = Math.min(1.8, Math.max(0.8, Number((mapZoom.value + delta).toFixed(1))))
 }
 </script>
 
@@ -242,23 +283,62 @@ function confirmCancelOrder() {
     </div>
 
     <div v-else-if="activeTab === 'route'" class="tab-panel">
-      <section class="route-map" aria-label="订单路线示意">
-        <div class="route-map__grid"></div>
-        <span class="route-map__zone route-map__zone--start">起点围栏</span>
-        <span class="route-map__zone route-map__zone--end">终点围栏</span>
-        <span class="route-map__track"></span>
-        <span class="route-map__pin route-map__pin--start"><i></i></span>
-        <span class="route-map__pin route-map__pin--end"><i></i></span>
-        <span class="route-map__car"><CarFront :size="16" /></span>
-      </section>
-      <div class="route-stats"><div><span>路线</span><strong>{{ order.routeName }}</strong></div><div><span>总用时</span><strong>{{ ['接乘客', '送乘客'].includes(order.status) ? '01:12:36（原型示例）' : '尚未开始' }}</strong></div></div>
+      <div class="route-workspace">
+        <aside class="passenger-point-panel">
+          <header><div><span>乘客点位</span><strong>{{ order.passengers.length }} 个下单组</strong></div><small>全部上车点与下车点</small></header>
+          <div class="passenger-point-list">
+            <article v-for="(passenger, index) in order.passengers" :key="passenger.orderPassengerId">
+              <span class="passenger-point-index">P{{ index + 1 }}</span>
+              <div><strong>{{ passenger.name }}</strong><p><i class="point-dot point-dot--pickup"></i><span>上车</span>{{ passenger.origin }}</p><p><i class="point-dot point-dot--dropoff"></i><span>下车</span>{{ passenger.destination }}</p></div>
+            </article>
+          </div>
+        </aside>
+
+        <section class="route-map" aria-label="订单实际行程地图">
+          <div class="route-map__canvas" :style="{ transform: `scale(${mapZoom})` }">
+            <div class="route-map__grid"></div>
+            <svg class="route-map__overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path class="map-road map-road--major" d="M-5 82 C18 68 29 65 43 49 S71 29 106 18" />
+              <path class="map-road" d="M8 -4 C16 21 31 34 53 44 S78 68 93 104" />
+              <path class="map-road" d="M-4 36 C19 39 37 30 55 24 S82 20 106 31" />
+              <ellipse class="map-geofence map-geofence--start" cx="16" cy="24" rx="12" ry="15" />
+              <ellipse class="map-geofence map-geofence--end" cx="86" cy="78" rx="12" ry="15" />
+              <polyline v-if="routeTrackPolyline" class="map-driver-track" :points="routeTrackPolyline" />
+              <g v-for="(passenger, index) in order.passengers" :key="`map-${passenger.orderPassengerId}`">
+                <circle class="map-passenger-point map-passenger-point--pickup" :cx="15 + index * 2" :cy="30 + index * 6" r="1.8" />
+                <circle class="map-passenger-point map-passenger-point--dropoff" :cx="87 - index * 2" :cy="72 - index * 6" r="1.8" />
+              </g>
+              <circle v-for="(point, index) in order.routeTelemetry?.driverPoints ?? []" :key="`track-${index}`" class="map-track-point" :cx="point.x" :cy="point.y" r="1.2" />
+            </svg>
+            <span class="route-map__zone-label route-map__zone-label--start">{{ order.routeTelemetry?.startGeofence || '起点围栏' }}</span>
+            <span class="route-map__zone-label route-map__zone-label--end">{{ order.routeTelemetry?.endGeofence || '终点围栏' }}</span>
+            <span v-if="latestRoutePoint" class="route-map__car" :style="{ left: `${latestRoutePoint.x}%`, top: `${latestRoutePoint.y}%` }"><CarFront :size="14" /></span>
+          </div>
+          <div v-if="!order.routeTelemetry?.trackingStartedAt" class="route-map__empty-track"><strong>司机轨迹尚未开始</strong><span>订单进入“接乘客”状态后开始接收司机上传点位</span></div>
+          <div class="route-map__zoom" aria-label="地图缩放控制">
+            <button type="button" :disabled="mapZoom <= 0.8" aria-label="缩小地图" @click="changeMapZoom(-0.2)"><Minus :size="14" /></button>
+            <button class="route-map__zoom-value" type="button" aria-label="重置地图缩放" @click="mapZoom = 1">{{ Math.round(mapZoom * 100) }}%</button>
+            <button type="button" :disabled="mapZoom >= 1.8" aria-label="放大地图" @click="changeMapZoom(0.2)"><Plus :size="14" /></button>
+          </div>
+          <div class="route-map__legend"><span><i class="point-dot point-dot--pickup"></i>乘客上车点</span><span><i class="point-dot point-dot--dropoff"></i>乘客下车点</span><span><i class="point-dot point-dot--track"></i>司机上传点位</span></div>
+        </section>
+      </div>
+      <div class="route-stats">
+        <div><span>路线</span><strong>{{ order.routeName }}</strong></div>
+        <div><span>起点围栏</span><strong>{{ order.routeTelemetry?.startGeofence || '—' }}</strong></div>
+        <div><span>终点围栏</span><strong>{{ order.routeTelemetry?.endGeofence || '—' }}</strong></div>
+        <div v-if="tripDurationLabel"><span>开始接乘客至结束总用时</span><strong>{{ tripDurationLabel }}</strong></div>
+      </div>
     </div>
 
     <div v-else class="tab-panel">
       <section v-if="order.serviceType === '拼车'" class="message-list">
-        <div><span class="message-avatar">林</span><p><strong>林诗雨 <small>09:12</small></strong><span>我的航班已经落地，正在前往入境检查。</span></p></div>
-        <div><span class="message-avatar message-avatar--driver">司</span><p><strong>司导 <small>09:14</small></strong><span>收到，我会在指定上车点等候。</span></p></div>
-        <div class="message-notice">原型示例消息 · 聊天记录仅查看，不支持后台发送。</div>
+        <div v-for="message in order.groupMessages ?? []" :key="message.id">
+          <span class="message-avatar" :class="{ 'message-avatar--driver': message.role === '司导', 'message-avatar--system': message.role === '系统' }">{{ message.role === '司导' ? '司' : message.role === '系统' ? '系' : message.author.slice(0, 1) }}</span>
+          <p><strong>{{ message.author }} <small>{{ formatLondonTime(message.createdAt) }}</small></strong><span>{{ message.content }}</span></p>
+        </div>
+        <div v-if="!(order.groupMessages?.length)" class="message-notice">当前拼车团暂无聊天记录。</div>
+        <div class="message-notice">聊天记录仅查看，不支持后台发送。</div>
       </section>
       <div v-else class="empty-state"><span class="empty-state__icon"><MessageSquareText :size="20" /></span><strong>独享订单无拼车团消息</strong><p>该订单未创建拼车群聊。</p></div>
     </div>
@@ -449,23 +529,60 @@ function confirmCancelOrder() {
 .driver-card p { margin: 0 0 10px; color: var(--text-faint); font-size: 10px; }
 .driver-signals { display: flex; gap: 6px; }
 
-.route-map { position: relative; height: 280px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--ink-50); }
-.route-map__grid { position: absolute; inset: 0; opacity: 0.7; background-image: linear-gradient(rgba(45, 99, 152, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(45, 99, 152, 0.08) 1px, transparent 1px); background-size: 32px 32px; transform: rotate(-8deg) scale(1.2); }
-.route-map__zone { position: absolute; display: inline-flex; align-items: center; justify-content: center; width: 96px; height: 64px; border: 1px dashed var(--ink-400); border-radius: 50%; background: rgba(227, 237, 245, 0.75); color: var(--ink-600); font-size: 8px; }
-.route-map__zone--start { top: 38px; left: 32px; }
-.route-map__zone--end { right: 30px; bottom: 36px; border-color: rgba(245, 124, 0, 0.6); background: rgba(255, 243, 224, 0.78); color: var(--brand-dark); }
-.route-map__track { position: absolute; top: 134px; left: 100px; width: calc(100% - 190px); height: 3px; border-radius: var(--radius-pill); background: var(--ink-600); transform: rotate(17deg); transform-origin: left center; }
-.route-map__pin { position: absolute; width: 18px; height: 18px; border: 4px solid #fff; border-radius: 50%; box-shadow: var(--shadow-md); }
-.route-map__pin--start { top: 74px; left: 74px; background: var(--ink-700); }
-.route-map__pin--end { right: 71px; bottom: 69px; background: var(--brand); }
-.route-map__car { position: absolute; top: 136px; left: 48%; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 3px solid #fff; border-radius: 50%; background: var(--ink-700); color: #fff; box-shadow: var(--shadow-md); }
-.route-stats { display: grid; grid-template-columns: 1.4fr 0.6fr; padding: 14px 0; gap: 14px; }
+.route-workspace { display: grid; grid-template-columns: 180px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--surface); }
+.passenger-point-panel { min-height: 320px; padding: 13px; border-right: 1px solid var(--border); background: var(--page); }
+.passenger-point-panel header { padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border); }
+.passenger-point-panel header > div { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.passenger-point-panel header span, .passenger-point-panel header small { color: var(--text-faint); font-size: 8px; }
+.passenger-point-panel header strong { color: var(--text-strong); font-size: 10px; }
+.passenger-point-panel header small { display: block; margin-top: 3px; }
+.passenger-point-list { display: flex; flex-direction: column; gap: 8px; }
+.passenger-point-list article { display: flex; align-items: flex-start; gap: 7px; }
+.passenger-point-index { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 50%; background: var(--ink-100); color: var(--ink-700); font-family: var(--font-mono); font-size: 8px; font-weight: 700; }
+.passenger-point-list article > div { min-width: 0; }
+.passenger-point-list strong { display: block; margin-bottom: 4px; color: var(--text-strong); font-size: 9px; }
+.passenger-point-list p { display: grid; grid-template-columns: 6px 24px minmax(0, 1fr); align-items: center; margin: 2px 0 0; color: var(--text-muted); font-size: 7px; gap: 3px; }
+.passenger-point-list p span { color: var(--text-faint); }
+.point-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ink-600); }
+.point-dot--dropoff { background: var(--brand); }
+.point-dot--track { background: var(--success); }
+
+.route-map { position: relative; height: 320px; overflow: hidden; background: #eef3f5; }
+.route-map__canvas { position: absolute; z-index: 1; inset: 0; transform-origin: center; transition: transform var(--motion-normal); }
+.route-map__grid { position: absolute; inset: 0; opacity: 0.85; background-image: linear-gradient(rgba(77, 106, 120, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(77, 106, 120, 0.08) 1px, transparent 1px); background-size: 28px 28px; transform: rotate(-6deg) scale(1.2); }
+.route-map__overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+.map-road { fill: none; stroke: rgba(255, 255, 255, 0.95); stroke-width: 2.2; }
+.map-road--major { stroke: rgba(255, 255, 255, 1); stroke-width: 4; }
+.map-geofence { fill: rgba(45, 99, 152, 0.12); stroke: rgba(45, 99, 152, 0.65); stroke-width: 0.5; stroke-dasharray: 2 1; }
+.map-geofence--end { fill: rgba(245, 124, 0, 0.12); stroke: rgba(245, 124, 0, 0.75); }
+.map-driver-track { fill: none; stroke: var(--success); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+.map-track-point { fill: var(--success); stroke: #fff; stroke-width: 0.55; }
+.map-passenger-point { stroke: #fff; stroke-width: 0.65; }
+.map-passenger-point--pickup { fill: var(--ink-700); }
+.map-passenger-point--dropoff { fill: var(--brand); }
+.route-map__zone-label { position: absolute; z-index: 2; max-width: 110px; padding: 3px 6px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.9); color: var(--ink-700); font-size: 7px; font-weight: 700; box-shadow: var(--shadow-sm); }
+.route-map__zone-label--start { top: 8%; left: 4%; }
+.route-map__zone-label--end { right: 3%; bottom: 5%; color: var(--brand-dark); }
+.route-map__car { position: absolute; z-index: 3; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 3px solid #fff; border-radius: 50%; background: var(--ink-700); color: #fff; box-shadow: var(--shadow-md); transform: translate(-50%, -50%); }
+.route-map__empty-track { position: absolute; z-index: 2; top: 50%; left: 50%; display: flex; align-items: center; width: 190px; flex-direction: column; padding: 9px 12px; border: 1px solid rgba(255, 255, 255, 0.9); border-radius: var(--radius-lg); background: rgba(255, 255, 255, 0.88); text-align: center; transform: translate(-50%, -50%); backdrop-filter: blur(4px); }
+.route-map__empty-track strong { color: var(--text-strong); font-size: 9px; }
+.route-map__empty-track span { margin-top: 3px; color: var(--text-faint); font-size: 7px; line-height: 1.4; }
+.route-map__zoom { position: absolute; z-index: 5; top: 10px; right: 10px; display: inline-flex; overflow: hidden; border: 1px solid rgba(215, 223, 229, 0.95); border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.94); box-shadow: var(--shadow-sm); }
+.route-map__zoom button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-right: 1px solid var(--border); background: transparent; color: var(--ink-700); }
+.route-map__zoom button:last-child { border-right: 0; }
+.route-map__zoom button:hover:not(:disabled) { background: var(--ink-50); }
+.route-map__zoom button:disabled { color: var(--text-faint); opacity: .45; }
+.route-map__zoom .route-map__zoom-value { width: 48px; color: var(--text-muted); font-family: var(--font-mono); font-size: 8px; }
+.route-map__legend { position: absolute; z-index: 2; right: 8px; bottom: 8px; display: flex; align-items: center; padding: 5px 7px; gap: 8px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.9); color: var(--text-faint); font-size: 7px; }
+.route-map__legend span { display: inline-flex; align-items: center; gap: 3px; }
+.route-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px 0; gap: 14px; }
 .route-stats > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 
 .message-list { display: flex; flex-direction: column; gap: 12px; }
 .message-list > div:not(.message-notice) { display: flex; align-items: flex-start; gap: 8px; }
 .message-avatar { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; background: var(--brand-100); color: var(--brand-dark); font-size: 9px; font-weight: 700; }
 .message-avatar--driver { background: var(--ink-100); color: var(--ink-700); }
+.message-avatar--system { background: var(--success-bg); color: var(--success); }
 .message-list p { max-width: 75%; padding: 9px 10px; margin: 0; border-radius: 4px 12px 12px; background: var(--page-2); color: var(--text-muted); font-size: 10px; }
 .message-list p strong { display: block; margin-bottom: 3px; color: var(--text-strong); font-size: 9px; }
 .message-list p small { color: var(--text-faint); font-family: var(--font-mono); font-size: 8px; font-weight: 400; }
@@ -477,5 +594,9 @@ function confirmCancelOrder() {
   .detail-facts { grid-template-columns: 1fr; }
   .related-order-card { align-items: flex-start; flex-direction: column; }
   .refund-record__facts { grid-template-columns: 1fr; }
+  .route-workspace { grid-template-columns: 1fr; }
+  .passenger-point-panel { min-height: 0; border-right: 0; border-bottom: 1px solid var(--border); }
+  .route-map { height: 260px; }
+  .route-stats { grid-template-columns: 1fr; }
 }
 </style>

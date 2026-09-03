@@ -89,7 +89,7 @@ onUnmounted(() => {
       <Menu :size="18" />
     </button>
 
-    <div class="topbar__crumbs">
+    <div class="topbar__crumbs app-breadcrumb">
       <span>{{ pageMeta.group }}</span>
       <ChevronRight :size="13" />
       <strong>{{ pageMeta.title }}</strong>

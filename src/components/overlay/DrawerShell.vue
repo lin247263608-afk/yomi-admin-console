@@ -133,13 +133,13 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <div class="overlay" @click.self="emit('close')"></div>
-    <aside ref="dialog" class="drawer" role="dialog" aria-modal="true" :aria-label="title" tabindex="-1" data-focus-trap-overlay>
+    <section ref="dialog" class="drawer" role="dialog" aria-modal="true" :aria-label="title" tabindex="-1" data-focus-trap-overlay>
       <header class="drawer__header">
         <div>
           <div v-if="eyebrow" class="page-header__eyebrow">{{ eyebrow }}</div>
           <h2>{{ title }}</h2>
         </div>
-        <button class="icon-button" type="button" aria-label="关闭抽屉" @click="emit('close')">
+        <button class="icon-button" type="button" aria-label="关闭详情弹窗" @click="emit('close')">
           <X :size="17" />
         </button>
       </header>
@@ -149,6 +149,6 @@ onUnmounted(() => {
       <footer v-if="$slots.footer" class="drawer__footer">
         <slot name="footer" />
       </footer>
-    </aside>
+    </section>
   </Teleport>
 </template>

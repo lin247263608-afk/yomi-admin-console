@@ -23,7 +23,7 @@ export interface ModuleFilter {
 export interface ModuleColumn {
   key: string
   label: string
-  kind?: 'plain' | 'primary' | 'mono' | 'status' | 'currency' | 'progress'
+  kind?: 'plain' | 'primary' | 'mono' | 'status' | 'currency' | 'progress' | 'image'
   secondaryKey?: string
   width?: string
 }
@@ -81,6 +81,7 @@ export interface ModuleCatalogEntry {
   /** Optional page chrome switches used when a module needs a denser layout. */
   showDescription?: boolean
   showInsight?: boolean
+  showOverview?: boolean
   showSecondaryAction?: boolean
   insight: {
     label: string

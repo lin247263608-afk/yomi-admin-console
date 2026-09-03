@@ -39,12 +39,10 @@ const draft = reactive({
   business: String(source.business ?? '接机'),
   startFenceId: String(source.startFenceId ?? activeFences.value[0]?.id ?? ''),
   endFenceId: String(source.endFenceId ?? activeFences.value.find((item) => item.id !== activeFences.value[0]?.id)?.id ?? ''),
-  distance: String(source.distance ?? ''),
-  duration: String(source.duration ?? ''),
+  distance: String(source.distance ?? '').replace(/[^\d.]/g, ''),
+  duration: String(source.duration ?? '').replace(/[^\d.]/g, ''),
   commissionRate: String(source.commissionRate ?? '18').replace('%', ''),
   deposit: String(source.deposit ?? '0'),
-  popular: String(source.popular ?? '非热门'),
-  status: String(source.status ?? '禁用'),
 })
 
 const vehiclePricing = reactive<VehiclePriceDraft[]>(readVehiclePricing(source))
@@ -128,6 +126,10 @@ function save() {
 
   const commission = Number(draft.commissionRate)
   if (!Number.isFinite(commission) || commission < 0 || commission > 100) return void (errorMessage.value = '常规抽佣比例必须在 0–100% 之间。')
+  const distance = Number(draft.distance)
+  if (!Number.isFinite(distance) || distance <= 0) return void (errorMessage.value = '路线距离必须是大于 0 的数值。')
+  const duration = Number(draft.duration)
+  if (!Number.isFinite(duration) || duration <= 0) return void (errorMessage.value = '预计时长必须是大于 0 的分钟数。')
   const deposit = Number(draft.deposit)
   if (!Number.isFinite(deposit) || deposit < 0) return void (errorMessage.value = '路线定金必须是大于或等于 0 的金额。')
   if (!vehiclePricing.length || vehiclePricing.some((item) => !item.vehicleId || !activeVehicles.value.some((vehicle) => vehicle.id === item.vehicleId))) {
@@ -163,8 +165,8 @@ function save() {
     startFenceId: draft.startFenceId,
     endFenceId: draft.endFenceId,
     fences: `${draft.startFenceId} → ${draft.endFenceId}`,
-    distance: draft.distance,
-    duration: draft.duration,
+    distance: `${distance} km`,
+    duration: `约 ${duration} 分钟`,
     commissionRate: `${commission}%`,
     deposit,
     vehiclePricing: vehiclePricing.map((item) => ({ vehicleId: item.vehicleId, baseFare: Number(item.baseFare), extraSeat: Number(item.extraSeat) })),
@@ -175,8 +177,8 @@ function save() {
     specialPeriods: specialPeriods.map((item) => ({ start: item.start, end: item.end, rate: Number(item.rate) })),
     specialCommission: `${specialPeriods.length} 条`,
     specialCommissionNote: specialPeriods.length ? specialPeriods.map((item) => `${item.start.replace('T', ' ')}—${item.end.replace('T', ' ')} · ${item.rate}%`).join('；') : '未配置特殊时段，使用路线常规抽佣',
-    popular: draft.popular,
-    status: draft.status,
+    popular: String(source.popular ?? '非热门'),
+    status: String(source.status ?? '启用'),
   }
   // 这些字段仅用于提示，不替代后端的坐标/面积算法。
   if (startFence && endFence) nextRow.routeHint = `${startFence.name} → ${endFence.name}`
@@ -185,21 +187,21 @@ function save() {
 </script>
 
 <template>
-  <ModalDialog :title="row ? `编辑接送机路线 · ${row.id}` : '新增接送机路线'" eyebrow="ROUTE PRICING" @close="emit('close')">
+  <ModalDialog :title="row ? `编辑接送机路线 · ${row.id}` : '新增接送机路线'" eyebrow="ROUTE PRICING" size="wide" @close="emit('close')">
     <div v-if="errorMessage" class="route-editor-message route-editor-message--error">{{ errorMessage }}</div>
     <div v-if="depositWarning" class="route-editor-message route-editor-message--warning">{{ depositWarning }}</div>
     <div class="route-editor-grid">
-      <label><span>路线名称</span><input v-model="draft.name" class="field-control" type="text" /></label>
-      <label><span>业务</span><select v-model="draft.business" class="field-control"><option>接机</option><option>送机</option></select></label>
-      <label><span>起点围栏（仅启用）</span><select v-model="draft.startFenceId" class="field-control"><option v-for="item in activeFences" :key="item.id" :value="item.id">{{ item.name }} · {{ item.type }}</option></select></label>
-      <label><span>终点围栏（仅启用）</span><select v-model="draft.endFenceId" class="field-control"><option v-for="item in activeFences" :key="item.id" :value="item.id">{{ item.name }} · {{ item.type }}</option></select></label>
-      <label><span>距离</span><input v-model="draft.distance" class="field-control" type="text" placeholder="如 29 km" /></label>
-      <label><span>时长</span><input v-model="draft.duration" class="field-control" type="text" placeholder="如 55 分钟" /></label>
+      <label class="route-editor-field--wide"><span>路线名称</span><input v-model="draft.name" class="field-control" type="text" placeholder="请输入对外展示的路线名称" /></label>
+      <label class="route-editor-field--wide"><span>业务</span><select v-model="draft.business" class="field-control"><option>接机</option><option>送机</option></select></label>
+      <label class="route-editor-field--wide"><span>起点围栏（仅启用）</span><select v-model="draft.startFenceId" class="field-control"><option v-for="item in activeFences" :key="item.id" :value="item.id">{{ item.name }} · {{ item.id }} · {{ item.type }}</option></select></label>
+      <label class="route-editor-field--wide"><span>终点围栏（仅启用）</span><select v-model="draft.endFenceId" class="field-control"><option v-for="item in activeFences" :key="item.id" :value="item.id">{{ item.name }} · {{ item.id }} · {{ item.type }}</option></select></label>
+      <label><span>距离（km）</span><input v-model="draft.distance" class="field-control" type="number" min="0.1" step="0.1" placeholder="如 29" /></label>
+      <label><span>预计时长（分钟）</span><input v-model="draft.duration" class="field-control" type="number" min="1" step="1" placeholder="如 55" /></label>
       <label><span>常规抽佣（0–100%）</span><input v-model="draft.commissionRate" class="field-control" type="number" min="0" max="100" /></label>
       <label><span>路线定金（£）</span><input v-model="draft.deposit" class="field-control" type="number" min="0" step="0.01" /></label>
-      <label><span>热门状态</span><select v-model="draft.popular" class="field-control"><option>热门</option><option>非热门</option></select></label>
-      <label><span>路线状态</span><select v-model="draft.status" class="field-control"><option>禁用</option><option>启用</option></select></label>
     </div>
+    <p class="route-editor-hint">新增路线默认启用且不标记为热门；请在列表操作栏中调整启停与热门状态。
+    </p>
 
     <section class="route-editor-section">
       <header><div><strong>车型定价</strong><small>仅可选择启用车型；加座价必须小于车型单价。</small></div><button class="btn btn--ghost" type="button" @click="addVehiclePricing"><Plus :size="13" />添加车型</button></header>
@@ -231,7 +233,8 @@ function save() {
 .route-editor-message { padding: 10px 12px; margin-bottom: 12px; border-radius: var(--radius-md); font-size: 10px; line-height: 1.5; }
 .route-editor-message--error { border: 1px solid var(--danger-border); background: var(--danger-bg); color: var(--danger); }
 .route-editor-message--warning { border: 1px solid var(--warning-border); background: var(--warning-bg); color: var(--warning); }
-.route-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.route-editor-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.route-editor-field--wide { grid-column: span 2; }
 .route-editor-grid label, .route-pricing-row { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
 .route-editor-grid label > span, .route-editor-section header strong { color: var(--text-subtle); font-size: 10px; font-weight: 700; }
 .route-editor-section { padding-top: 17px; margin-top: 17px; border-top: 1px solid var(--border); }
@@ -243,5 +246,7 @@ function save() {
 .route-pricing-row .icon-button { width: 28px; height: 28px; color: var(--text-faint); }
 .route-pricing-row .icon-button:disabled { cursor: not-allowed; opacity: .4; }
 .route-editor-empty { margin: 5px 0 0; color: var(--text-faint); font-size: 9px; }
+.route-editor-hint { padding: 9px 11px; margin: 12px 0 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--info-bg); color: var(--text-muted); font-size: 9px; line-height: 1.55; }
+@media (max-width: 900px) { .route-editor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .route-editor-field--wide { grid-column: span 1; } }
 @media (max-width: 620px) { .route-editor-grid { grid-template-columns: 1fr; } .route-pricing-row, .route-period-row { grid-template-columns: 1fr 1fr 1fr 30px; } }
 </style>

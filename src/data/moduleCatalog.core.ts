@@ -1,9 +1,16 @@
 import type { ModuleCatalogEntry } from '@/data/moduleCatalog.types'
 
+function vehicleImage(label: string, accent: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><defs><linearGradient id="bg" x1="0" x2="1"><stop stop-color="#f5f8fb"/><stop offset="1" stop-color="#e7eef6"/></linearGradient></defs><rect width="320" height="180" rx="18" fill="url(#bg)"/><path d="M66 112h188l-15-45c-3-9-11-15-21-15H116c-10 0-18 5-22 14l-28 46Z" fill="${accent}" opacity=".92"/><path d="M109 64h101c7 0 12 3 15 10l8 24H89l15-27c1-4 3-7 5-7Z" fill="#dceafa"/><rect x="49" y="101" width="222" height="37" rx="13" fill="${accent}"/><circle cx="94" cy="139" r="19" fill="#18324d"/><circle cx="94" cy="139" r="8" fill="#dce5ed"/><circle cx="229" cy="139" r="19" fill="#18324d"/><circle cx="229" cy="139" r="8" fill="#dce5ed"/><rect x="61" y="111" width="34" height="9" rx="4" fill="#fff4dc"/><rect x="235" y="111" width="24" height="9" rx="4" fill="#ffb057"/><text x="160" y="164" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#526578">${label}</text></svg>`
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
+
 const fleetMonitoringModule: ModuleCatalogEntry = {
   kind: 'dashboard',
   eyebrow: '司导运力监控',
   description: '将实时运力指标与司导明细集中在同一页面，按英国运营自然日统计今日接单、应得收入与在线时长。',
+  showDescription: false,
+  showInsight: false,
   insight: {
     label: '状态口径',
     title: '连接状态与权限状态独立统计',
@@ -167,6 +174,9 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: '路线与定价 / 车型管理',
     description: '维护车型座位数与大/小行李独立容量，是路线定价、司机认证与订单派单校验的共同基础数据。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '依赖关系',
       title: '车型应先于路线定价完成配置',
@@ -178,11 +188,18 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '禁用车型', value: '1', note: '保留历史关联', tone: 'warning', filter: { key: 'status', value: '禁用' } },
       { label: '路线关联', value: '45', note: '车型定价配置次数' },
     ],
-    searchPlaceholder: '搜索车型ID或车型名称',
-    filters: [{ key: 'status', label: '状态', options: ['全部', '启用', '禁用'] }],
+    searchPlaceholder: '搜索车型名称',
+    filters: [
+      { key: 'seats', label: '座位数', options: ['全部', '5', '7'] },
+      { key: 'grade', label: '车型等级', options: ['全部', '经济型', '舒适型', '豪华型'] },
+      { key: 'status', label: '状态', options: ['全部', '启用', '禁用'] },
+    ],
     columns: [
       { key: 'id', label: '车型ID', kind: 'mono', width: '116px' },
+      { key: 'image', label: '车型图片', kind: 'image', width: '132px' },
       { key: 'name', label: '车型名称', kind: 'primary', width: '150px' },
+      { key: 'description', label: '车型描述', width: '230px' },
+      { key: 'grade', label: '车型等级', width: '100px' },
       { key: 'seats', label: '座位数', width: '88px' },
       { key: 'passengerCapacity', label: '可载乘客', width: '100px' },
       { key: 'largeLuggageCapacity', label: '大行李容量', width: '108px' },
@@ -192,10 +209,10 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', kind: 'status', width: '94px' },
     ],
     rows: [
-      { id: 'VT-001', name: '经济5座', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 3, routeCount: 12, updatedAt: '2026-08-12 11:20', status: '启用' },
-      { id: 'VT-002', name: '豪华5座', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 4, routeCount: 8, updatedAt: '2026-08-10 16:45', status: '启用' },
-      { id: 'VT-003', name: '经济7座', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 3, smallLuggageCapacity: 6, routeCount: 15, updatedAt: '2026-08-15 09:08', status: '启用' },
-      { id: 'VT-004', name: '商务7座', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 4, smallLuggageCapacity: 7, routeCount: 10, updatedAt: '2026-08-07 14:32', status: '禁用' },
+      { id: 'VT-001', image: vehicleImage('ECONOMY 5', '#2d6398'), name: '经济5座', description: '适合日常接送机与短途出行，兼顾乘坐空间和经济性。', grade: '经济型', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 3, routeCount: 12, updatedAt: '2026-08-12 11:20', status: '启用' },
+      { id: 'VT-002', image: vehicleImage('LUXURY 5', '#bc7a24'), name: '豪华5座', description: '面向高品质出行场景，提供更舒适的乘坐体验与内饰配置。', grade: '豪华型', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 4, routeCount: 8, updatedAt: '2026-08-10 16:45', status: '启用' },
+      { id: 'VT-003', image: vehicleImage('ECONOMY 7', '#3e7d68'), name: '经济7座', description: '适合多人同行与家庭出行，提供更充足的乘客及行李容量。', grade: '经济型', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 3, smallLuggageCapacity: 6, routeCount: 15, updatedAt: '2026-08-15 09:08', status: '启用' },
+      { id: 'VT-004', image: vehicleImage('COMFORT 7', '#695c8f'), name: '商务7座', description: '适合商务接待与团队出行，强调空间、舒适度与装载能力。', grade: '舒适型', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 4, smallLuggageCapacity: 7, routeCount: 10, updatedAt: '2026-08-07 14:32', status: '禁用' },
     ],
     primaryAction: '新增车型',
     secondaryAction: '查看配置依赖',
@@ -215,6 +232,9 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: '路线与定价 / 围栏管理',
     description: '用机场与城市多边形围栏定义路线起终点范围，并在保存时检查包含或部分交叠关系。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '地图规则',
       title: '每个围栏至少需要 3 个顶点',
@@ -226,7 +246,7 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '城市围栏', value: '4', note: '城市核心服务范围', filter: { key: 'type', value: '城市' } },
       { label: '已启用', value: '7', note: '可被新路线关联', tone: 'success', filter: { key: 'status', value: '启用' } },
     ],
-    searchPlaceholder: '搜索围栏ID或围栏名称',
+    searchPlaceholder: '搜索围栏名称',
     filters: [
       { key: 'type', label: '围栏类型', options: ['全部', '机场', '城市'] },
       { key: 'status', label: '状态', options: ['全部', '启用', '禁用'] },
@@ -234,23 +254,21 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     columns: [
       { key: 'id', label: '围栏ID', kind: 'mono', width: '116px' },
       { key: 'name', label: '围栏名称', kind: 'primary', width: '154px' },
-      { key: 'type', label: '类型', kind: 'status', width: '86px' },
-      { key: 'description', label: '覆盖范围', width: '258px' },
-      { key: 'geometryRelation', label: '几何关系', width: '190px' },
-      { key: 'vertexCount', label: '顶点数', width: '82px' },
+      { key: 'type', label: '围栏类型', kind: 'status', width: '96px' },
+      { key: 'description', label: '描述', width: '300px' },
       { key: 'routeCount', label: '关联路线', width: '96px' },
-      { key: 'updatedAt', label: '更新时间', width: '154px' },
       { key: 'status', label: '状态', kind: 'status', width: '92px' },
+      { key: 'updatedAt', label: '更新时间', width: '154px' },
     ],
     rows: [
-      { id: 'GF-LHR', name: '希思罗机场', type: '机场', description: '覆盖 T2–T5 到达与出发区域', geometryRelation: '包含关系（小围栏优先）', routeCount: 6, vertexCount: 18, updatedAt: '2026-08-16 10:42', status: '启用' },
-      { id: 'GF-LGW', name: '盖特威克机场', type: '机场', description: '覆盖 North / South Terminal', geometryRelation: '正常', routeCount: 4, vertexCount: 12, updatedAt: '2026-08-14 15:26', status: '启用' },
-      { id: 'GF-LON-Z1', name: '伦敦一区', type: '城市', description: 'Central London Congestion Zone', geometryRelation: '包含关系（小围栏优先）', routeCount: 9, vertexCount: 24, updatedAt: '2026-08-17 18:05', status: '启用' },
-      { id: 'GF-CBG', name: '剑桥市区', type: '城市', description: 'CB1–CB5 核心服务区域', geometryRelation: '正常', routeCount: 2, vertexCount: 14, updatedAt: '2026-08-11 09:38', status: '启用' },
-      { id: 'GF-BHX', name: '伯明翰机场', type: '机场', description: '航站楼及指定商业接送区', geometryRelation: '部分交叠（仅警示）', routeCount: 1, vertexCount: 10, updatedAt: '2026-08-08 13:17', status: '禁用' },
-      { id: 'GF-MAN', name: '曼彻斯特机场', type: '机场', description: '覆盖 T1–T3 指定接送区域', geometryRelation: '正常', routeCount: 1, vertexCount: 16, updatedAt: '2026-08-06 11:05', status: '启用' },
-      { id: 'GF-MAN-CTR', name: '曼彻斯特市中心', type: '城市', description: 'Manchester City Centre 核心区域', geometryRelation: '包含关系（小围栏优先）', routeCount: 1, vertexCount: 15, updatedAt: '2026-08-05 17:40', status: '启用' },
-      { id: 'GF-COV', name: '考文垂市区', type: '城市', description: 'Coventry Ring Road 内核心区域', geometryRelation: '正常', routeCount: 1, vertexCount: 13, updatedAt: '2026-08-04 09:25', status: '启用' },
+      { id: 'GF-LHR', name: '希思罗机场', type: '机场', description: '覆盖 T2–T5 到达与出发区域', polygon: [{ x: 45, y: 66 }, { x: 51, y: 64 }, { x: 54, y: 68 }, { x: 52, y: 73 }, { x: 46, y: 74 }, { x: 43, y: 70 }], geometryRelation: '包含关系（小围栏优先）', relatedFence: '伦敦一区', routeCount: 6, vertexCount: 6, updatedAt: '2026-08-16 10:42', status: '启用' },
+      { id: 'GF-LGW', name: '盖特威克机场', type: '机场', description: '覆盖 North / South Terminal', polygon: [{ x: 55, y: 77 }, { x: 61, y: 75 }, { x: 64, y: 80 }, { x: 61, y: 85 }, { x: 55, y: 84 }], geometryRelation: '正常', routeCount: 4, vertexCount: 5, updatedAt: '2026-08-14 15:26', status: '启用' },
+      { id: 'GF-LON-Z1', name: '伦敦一区', type: '城市', description: 'Central London Congestion Zone', polygon: [{ x: 41, y: 57 }, { x: 60, y: 54 }, { x: 70, y: 62 }, { x: 68, y: 78 }, { x: 50, y: 82 }, { x: 39, y: 72 }], geometryRelation: '包含关系（小围栏优先）', relatedFence: '希思罗机场', routeCount: 9, vertexCount: 6, updatedAt: '2026-08-17 18:05', status: '启用' },
+      { id: 'GF-CBG', name: '剑桥市区', type: '城市', description: 'CB1–CB5 核心服务区域', polygon: [{ x: 59, y: 49 }, { x: 66, y: 48 }, { x: 69, y: 54 }, { x: 64, y: 58 }, { x: 58, y: 55 }], geometryRelation: '正常', routeCount: 2, vertexCount: 5, updatedAt: '2026-08-11 09:38', status: '启用' },
+      { id: 'GF-BHX', name: '伯明翰机场', type: '机场', description: '航站楼及指定商业接送区', polygon: [{ x: 33, y: 43 }, { x: 42, y: 42 }, { x: 46, y: 49 }, { x: 40, y: 55 }, { x: 32, y: 51 }], geometryRelation: '部分交叠（仅警示）', relatedFence: '考文垂市区', routeCount: 1, vertexCount: 5, updatedAt: '2026-08-08 13:17', status: '禁用' },
+      { id: 'GF-MAN', name: '曼彻斯特机场', type: '机场', description: '覆盖 T1–T3 指定接送区域', polygon: [{ x: 32, y: 23 }, { x: 43, y: 22 }, { x: 46, y: 34 }, { x: 35, y: 37 }, { x: 29, y: 30 }], geometryRelation: '包含关系（小围栏优先）', relatedFence: '曼彻斯特市中心', routeCount: 1, vertexCount: 5, updatedAt: '2026-08-06 11:05', status: '启用' },
+      { id: 'GF-MAN-CTR', name: '曼彻斯特市中心', type: '城市', description: 'Manchester City Centre 核心区域', polygon: [{ x: 35, y: 27 }, { x: 41, y: 26 }, { x: 43, y: 31 }, { x: 38, y: 34 }, { x: 34, y: 31 }], geometryRelation: '包含关系（小围栏优先）', relatedFence: '曼彻斯特机场', routeCount: 1, vertexCount: 5, updatedAt: '2026-08-05 17:40', status: '启用' },
+      { id: 'GF-COV', name: '考文垂市区', type: '城市', description: 'Coventry Ring Road 内核心区域', polygon: [{ x: 41, y: 47 }, { x: 49, y: 46 }, { x: 52, y: 53 }, { x: 47, y: 58 }, { x: 40, y: 54 }], geometryRelation: '部分交叠（仅警示）', relatedFence: '伯明翰机场', routeCount: 1, vertexCount: 5, updatedAt: '2026-08-04 09:25', status: '启用' },
     ],
     primaryAction: '新增围栏',
     secondaryAction: '打开地图总览',
@@ -270,6 +288,9 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: '路线与定价 / 接送机路线配置',
     description: '配置接送机路线的启用围栏组合、路线定金、常规抽佣、车型单价/加座价及特殊时段抽佣；起终点围栏与关联车型下拉仅取启用项且不可相同。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '变更保护',
       title: '运行中的路线不可直接修改价格',
@@ -281,7 +302,7 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '热门路线', value: '6', note: '展示于 APP 与小程序首页', tone: 'warning', filter: { key: 'popular', value: '热门' } },
       { label: '接机路线', value: '11', note: '机场围栏作为起点', filter: { key: 'business', value: '接机' } },
     ],
-    searchPlaceholder: '搜索路线ID、名称、起点围栏或终点围栏',
+    searchPlaceholder: '按路线ID、路线名称、业务、围栏、热门与状态检索',
     filters: [
       { key: 'business', label: '业务', options: ['全部', '接机', '送机'] },
       { key: 'popular', label: '热门', options: ['全部', '热门', '非热门'] },
@@ -294,8 +315,6 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'distance', label: '距离 / 时长', secondaryKey: 'duration', width: '116px' },
       { key: 'commissionRate', label: '常规抽佣', width: '96px' },
       { key: 'deposit', label: '路线定金', kind: 'currency', width: '104px' },
-      { key: 'vehiclePricingLabel', label: '车型定价', width: '220px' },
-      { key: 'specialCommission', label: '特殊时段抽佣', kind: 'primary', secondaryKey: 'specialCommissionNote', width: '220px' },
       { key: 'popular', label: '热门', kind: 'status', width: '86px' },
       { key: 'status', label: '状态', kind: 'status', width: '92px' },
     ],
@@ -307,7 +326,6 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { id: 'RT-BHX-COV', name: '伯明翰机场 → 考文垂', fences: 'GF-BHX → GF-COV', startFenceId: 'GF-BHX', endFenceId: 'GF-COV', business: '接机', distance: '25 km', duration: '约 35 分钟', commissionRate: '15%', deposit: 15, vehiclePricing: [{ vehicleId: 'VT-001', baseFare: 61, extraSeat: 6 }], vehiclePricingLabel: '经济5座 £61 + £6/座', specialPeriods: [{ start: '2026-12-24T00:00', end: '2027-01-02T23:59', rate: 20 }], specialCommission: '1 条', specialCommissionNote: '2026-12-24 00:00—2027-01-02 23:59 · 20%', popular: '非热门', status: '禁用' },
     ],
     primaryAction: '新增路线',
-    secondaryAction: '路线定价说明',
     rowAction: {
       label: '启用 / 禁用',
       mode: 'toggle',
@@ -324,6 +342,9 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: '路线与定价 / 包车路线配置',
     description: '维护面向乘客展示的包车线路、参考金额与咨询电话；参考金额单位为英镑，仅用于页面展示，业务仍在线下沟通成交。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '业务边界',
       title: '包车路线仅作内容展示与咨询引流',
@@ -343,16 +364,16 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'description', label: '路线描述', width: '300px' },
       { key: 'referenceAmount', label: '参考金额', kind: 'currency', width: '112px' },
       { key: 'phone', label: '联系电话', width: '156px' },
+      { key: 'sort', label: '排序', kind: 'mono', width: '82px' },
       { key: 'status', label: '状态', kind: 'status', width: '92px' },
     ],
     rows: [
-      { id: 'CR-001', name: '伦敦—牛津—比斯特一日游', intro: '名校古城与购物行程', description: '伦敦出发，游览牛津大学核心学院后前往比斯特购物村。', referenceAmount: 420, phone: '+44 20 3988 2001', status: '启用' },
-      { id: 'CR-002', name: '伦敦—科茨沃尔德经典线', intro: '英伦乡村深度包车', description: '串联水上伯顿、拜伯里与城堡庄园，可按需求调整停留时长。', referenceAmount: 520, phone: '+44 20 3988 2002', status: '启用' },
-      { id: 'CR-003', name: '爱丁堡—苏格兰高地', intro: '城堡、峡谷与高地风光', description: '从爱丁堡出发，经斯特灵、格伦科峡谷前往高地观景区域。', referenceAmount: 680, phone: '+44 13 1555 2108', status: '启用' },
-      { id: 'CR-004', name: '曼彻斯特—湖区', intro: '温德米尔湖区定制行程', description: '覆盖温德米尔、安布尔赛德，可按家庭与摄影需求定制停靠点。', referenceAmount: 560, phone: '+44 16 1555 7310', status: '禁用' },
+      { id: 'CR-001', name: '伦敦—牛津—比斯特一日游', intro: '名校古城与购物行程', description: '伦敦出发，游览牛津大学核心学院后前往比斯特购物村。', referenceAmount: 420, phone: '+44 20 3988 2001', sort: 10, status: '启用' },
+      { id: 'CR-002', name: '伦敦—科茨沃尔德经典线', intro: '英伦乡村深度包车', description: '串联水上伯顿、拜伯里与城堡庄园，可按需求调整停留时长。', referenceAmount: 520, phone: '+44 20 3988 2002', sort: 20, status: '启用' },
+      { id: 'CR-003', name: '爱丁堡—苏格兰高地', intro: '城堡、峡谷与高地风光', description: '从爱丁堡出发，经斯特灵、格伦科峡谷前往高地观景区域。', referenceAmount: 680, phone: '+44 13 1555 2108', sort: 30, status: '启用' },
+      { id: 'CR-004', name: '曼彻斯特—湖区', intro: '温德米尔湖区定制行程', description: '覆盖温德米尔、安布尔赛德，可按家庭与摄影需求定制停靠点。', referenceAmount: 560, phone: '+44 16 1555 7310', sort: 40, status: '禁用' },
     ],
     primaryAction: '新增包车路线',
-    secondaryAction: '预览乘客端',
     rowAction: {
       label: '启用 / 禁用',
       mode: 'toggle',
@@ -369,6 +390,8 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'settings',
     eyebrow: '业务配置管理 / 订单配置',
     description: '维护下单窗口、异常上报时点和订单冲突校验范围；保存后按各配置的生效口径应用。',
+    showDescription: false,
+    showOverview: false,
     insight: {
       label: '联动校验',
       title: '拼车下单截止不得早于业务撮合门槛',
@@ -409,6 +432,8 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'settings',
     eyebrow: '业务配置管理 / 拼车配置',
     description: '管理拼车团成团门槛、大小行李总件数阈值、截团时间和出发时间撮合窗口；阈值仅对新团锁定。',
+    showDescription: false,
+    showOverview: false,
     insight: {
       label: '参数锁定',
       title: '成团参数仅对新拼车团生效',
@@ -449,6 +474,8 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'settings',
     eyebrow: '业务配置管理 / 支付配置',
     description: '配置延迟分账与司机提现规则；司机仅可在可提现日于 APP 主动发起，后台不设审批，系统自动处理打款。',
+    showDescription: false,
+    showOverview: false,
     insight: {
       label: '主动提现',
       title: '司机提现无需后台人工审批',

@@ -672,6 +672,57 @@ orders.forEach((order, orderIndex) => {
   if (order.refundRecord) {
     order.refundRecord.amountPence = order.amountPence
   }
+
+  const [routeStart = '路线起点', routeEnd = '路线终点'] = order.routeName.split(' → ')
+  const trackingStarted = ['接乘客', '送乘客', '已完成'].includes(order.status)
+  const trackingEnded = order.status === '已完成'
+  const trackPointCount = order.status === '接乘客' ? 4 : order.status === '送乘客' ? 7 : trackingEnded ? 9 : 0
+  const trackingStartedMinutesAgo = order.status === '接乘客' ? 48 : order.status === '送乘客' ? 86 : 145
+  const pointTemplate = [
+    [19, 28], [27, 34], [36, 41], [45, 48], [55, 53], [64, 59], [72, 66], [80, 72], [87, 77],
+  ]
+  order.routeTelemetry = {
+    startGeofence: `${routeStart}起点围栏`,
+    endGeofence: `${routeEnd}终点围栏`,
+    trackingStartedAt: trackingStarted ? isoFromNow(-trackingStartedMinutesAgo) : undefined,
+    trackingEndedAt: trackingEnded ? isoFromNow(-12) : undefined,
+    driverPoints: pointTemplate.slice(0, trackPointCount).map(([x = 0, y = 0], pointIndex) => ({
+      x: x + (orderIndex % 2) * 2,
+      y: y - (orderIndex % 3),
+      recordedAt: isoFromNow(-trackingStartedMinutesAgo + pointIndex * 12),
+    })),
+  }
+
+  if (order.serviceType === '拼车') {
+    const hasUnread = ['待派单', '接乘客'].includes(order.status)
+    const primaryPassenger = order.passengers[0]?.name ?? '乘客'
+    order.groupMessages = [
+      {
+        id: `MSG-${order.id}-1`,
+        author: primaryPassenger,
+        role: '乘客',
+        content: '我的行程信息已经确认，请司机到达后在群里提醒。',
+        createdAt: isoFromNow(-42),
+        readAt: isoFromNow(-30),
+      },
+      {
+        id: `MSG-${order.id}-2`,
+        author: order.driverName?.split(' · ')[0] ?? '系统',
+        role: order.driverName ? '司导' : '系统',
+        content: order.driverName ? '收到，我会按照各位乘客的上车点依次接乘。' : '订单仍在派单中，司机确认后将在群内同步。',
+        createdAt: isoFromNow(-18),
+        readAt: hasUnread ? undefined : isoFromNow(-10),
+      },
+      {
+        id: `MSG-${order.id}-3`,
+        author: order.passengers[1]?.name ?? primaryPassenger,
+        role: '乘客',
+        content: '我已更新到达上车点的预计时间，请留意。',
+        createdAt: isoFromNow(-6),
+        readAt: hasUnread ? undefined : isoFromNow(-2),
+      },
+    ]
+  }
 })
 
 export const driverCandidates: DriverCandidate[] = [
@@ -771,6 +822,7 @@ export const driverAudits: DriverAudit[] = [
   {
     id: 'AUD-260818-042',
     userId: 'U-10842',
+    driverId: 'DR-01042',
     name: '赵清和',
     englishName: 'Claire Zhao',
     phone: '+44 7531 818 420',
@@ -786,13 +838,16 @@ export const driverAudits: DriverAudit[] = [
     credentials: [
       { name: 'PH Driver License', expiresAt: isoFromNow(60 * 24 * 410), state: 'valid' },
       { name: 'PH Vehicle License', expiresAt: isoFromNow(60 * 24 * 42), state: 'expiring' },
+      { name: 'DBS 无犯罪记录证明', issuedAt: '2026-05-18', state: 'valid' },
       { name: 'Commercial Insurance', expiresAt: isoFromNow(60 * 24 * 180), state: 'valid' },
+      { name: 'Compliance Test', expiresAt: isoFromNow(60 * 24 * 140), state: 'valid' },
       { name: 'MOT', expiresAt: isoFromNow(60 * 24 * 95), state: 'valid' },
     ],
   },
   {
     id: 'AUD-260818-038',
     userId: 'U-09517',
+    driverId: 'DR-00917',
     name: '沈佳宁',
     englishName: 'Nina Shen',
     phone: '+44 7811 304 822',
@@ -808,13 +863,16 @@ export const driverAudits: DriverAudit[] = [
     credentials: [
       { name: 'PH Driver License', expiresAt: isoFromNow(60 * 24 * 260), state: 'valid' },
       { name: 'PH Vehicle License', expiresAt: isoFromNow(60 * 24 * 175), state: 'valid' },
+      { name: 'DBS 无犯罪记录证明', issuedAt: '2025-09-22', state: 'valid' },
       { name: 'Commercial Insurance', expiresAt: isoFromNow(60 * 24 * 120), state: 'valid' },
+      { name: 'Compliance Test', expiresAt: isoFromNow(60 * 24 * 165), state: 'valid' },
       { name: 'MOT', expiresAt: isoFromNow(60 * 24 * 33), state: 'expiring' },
     ],
   },
   {
     id: 'AUD-260817-031',
     userId: 'U-08124',
+    driverId: 'DR-00308',
     name: '高朗',
     englishName: 'Leon Gao',
     phone: '+44 7802 100 449',
@@ -830,13 +888,16 @@ export const driverAudits: DriverAudit[] = [
     credentials: [
       { name: 'PH Driver License', expiresAt: isoFromNow(-60 * 24 * 4), state: 'expired' },
       { name: 'PH Vehicle License', expiresAt: isoFromNow(60 * 24 * 86), state: 'valid' },
+      { name: 'DBS 无犯罪记录证明', issuedAt: '2024-11-08', state: 'valid' },
       { name: 'Commercial Insurance', expiresAt: isoFromNow(60 * 24 * 71), state: 'valid' },
+      { name: 'Compliance Test', expiresAt: isoFromNow(-60 * 24 * 17), state: 'expired' },
       { name: 'MOT', expiresAt: isoFromNow(60 * 24 * 152), state: 'valid' },
     ],
   },
   {
     id: 'AUD-260817-029',
     userId: 'U-07811',
+    driverId: 'DR-00591',
     name: '何野',
     englishName: 'Noah He',
     phone: '+44 7320 185 671',
@@ -852,7 +913,9 @@ export const driverAudits: DriverAudit[] = [
     credentials: [
       { name: 'PH Driver License', expiresAt: isoFromNow(60 * 24 * 300), state: 'valid' },
       { name: 'PH Vehicle License', expiresAt: isoFromNow(60 * 24 * 212), state: 'valid' },
+      { name: 'DBS 无犯罪记录证明', issuedAt: '2025-10-13', state: 'valid' },
       { name: 'Commercial Insurance', expiresAt: isoFromNow(60 * 24 * 190), state: 'valid' },
+      { name: 'Compliance Test', expiresAt: isoFromNow(60 * 24 * 205), state: 'valid' },
       { name: 'MOT', expiresAt: isoFromNow(60 * 24 * 120), state: 'valid' },
     ],
   },

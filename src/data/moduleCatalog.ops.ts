@@ -1,10 +1,92 @@
-import type { ModuleCatalogEntry } from '@/data/moduleCatalog.types'
+import type { ModuleCatalogEntry, ModuleRow } from '@/data/moduleCatalog.types'
+
+function bannerImage(title: string, subtitle: string, start: string, end: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="240" viewBox="0 0 720 240"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient><pattern id="p" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="white" stroke-opacity=".08"/></pattern></defs><rect width="720" height="240" rx="24" fill="url(#g)"/><rect width="720" height="240" rx="24" fill="url(#p)"/><circle cx="610" cy="52" r="116" fill="white" fill-opacity=".1"/><circle cx="650" cy="190" r="78" fill="white" fill-opacity=".08"/><rect x="50" y="47" width="52" height="52" rx="15" fill="#ff7a00"/><text x="76" y="81" text-anchor="middle" font-family="Arial,sans-serif" font-size="28" font-weight="800" fill="white">Y</text><text x="50" y="139" font-family="Arial,sans-serif" font-size="34" font-weight="800" fill="white">${title}</text><text x="50" y="174" font-family="Arial,sans-serif" font-size="18" fill="white" fill-opacity=".78">${subtitle}</text><path d="M526 154h105l21 29H503l23-29Z" fill="white" fill-opacity=".82"/><rect x="489" y="178" width="178" height="25" rx="10" fill="white" fill-opacity=".9"/><circle cx="532" cy="205" r="15" fill="#17324d"/><circle cx="630" cy="205" r="15" fill="#17324d"/></svg>`
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
+
+type SystemMessageSeed = {
+  endpoint: '乘客端' | '司导端'
+  group: string
+  node: string
+  triggerAt: string
+  content: string
+  variables?: string
+  disabled?: boolean
+}
+
+const passengerSystemMessageSeeds: SystemMessageSeed[] = [
+  { endpoint: '乘客端', group: '账号', node: '注册成功', triggerAt: '账号注册完成后', content: '欢迎加入有米出行，您的账号已注册成功。' },
+  { endpoint: '乘客端', group: '账号', node: '司机审核通过', triggerAt: '司机认证审核通过后', content: '您的司导认证已通过，现在可以开启接单。' },
+  { endpoint: '乘客端', group: '账号', node: '司机审核驳回', triggerAt: '司机认证审核驳回后', content: '您的司导认证未通过，请根据审核意见修改后重新提交。' },
+  { endpoint: '乘客端', group: '支付', node: '定金支付成功', triggerAt: '拼车定金支付完成后', content: '订单 {orderNo} 定金 {depositAmount} 支付成功，正在为您拼团。' },
+  { endpoint: '乘客端', group: '支付', node: '全款支付成功', triggerAt: '独享订单全款到账后', content: '订单 {orderNo} 已支付 {orderAmount}。' },
+  { endpoint: '乘客端', group: '支付', node: '支付超时取消', triggerAt: '订单超过支付时限后', content: '订单 {orderNo} 因超时未支付已自动取消。', variables: '{orderNo}' },
+  { endpoint: '乘客端', group: '拼车', node: '拼团成功', triggerAt: '拼车团达到成团条件后', content: '订单 {orderNo} 已拼团成功，请关注后续行程通知。', variables: '{orderNo}、{departureAt}' },
+  { endpoint: '乘客端', group: '拼车', node: '截团前提醒', triggerAt: '拼车团截团前', content: '您的拼车团将于 {deadlineAt} 截团，请留意拼团结果。' },
+  { endpoint: '乘客端', group: '拼车', node: '拼团失败', triggerAt: '截团时未达到成团条件', content: '很抱歉，订单 {orderNo} 拼团失败，定金将原路退回。', variables: '{orderNo}' },
+  { endpoint: '乘客端', group: '拼车', node: '拼团已取消', triggerAt: '平台或成员操作导致拼车团取消', content: '订单 {orderNo} 所在拼车团已取消，请查看退款进度。', variables: '{orderNo}' },
+  { endpoint: '乘客端', group: '拼车', node: '成员变动', triggerAt: '拼车团成员加入或退出后', content: '您的拼车团成员发生变动，当前共 {memberCount} 人。', variables: '{orderNo}、{memberCount}' },
+  { endpoint: '乘客端', group: '支付', node: '尾款待付', triggerAt: '成团且价格锁定后', content: '订单 {orderNo} 尾款 {balanceAmount} 待支付，请在出发前完成付款。' },
+  { endpoint: '乘客端', group: '支付', node: '尾款补款提醒', triggerAt: '订单价格调整需补款时', content: '订单 {orderNo} 需补付 {balanceAmount}，请及时完成支付。' },
+  { endpoint: '乘客端', group: '支付', node: '尾款差额退还', triggerAt: '尾款结算产生退还差额后', content: '订单 {orderNo} 尾款差额 {balanceAmount} 已发起原路退还。' },
+  { endpoint: '乘客端', group: '派单', node: '司机已接单', triggerAt: '司机确认接单后', content: '司机已接订单 {orderNo}，您可在订单详情查看司机信息。', variables: '{orderNo}、{driverName}' },
+  { endpoint: '乘客端', group: '派单', node: '司机已改派', triggerAt: '平台完成司机改派后', content: '订单 {orderNo} 的司机已调整，请查看最新司机信息。', variables: '{orderNo}、{driverName}' },
+  { endpoint: '乘客端', group: '行程', node: '司机已出发', triggerAt: '司机点击已出发后', content: '司机已出发前往接车点，请保持手机畅通。', variables: '{orderNo}' },
+  { endpoint: '乘客端', group: '行程', node: '司机已到达', triggerAt: '司机到达乘客上车点后', content: '司机已到达约定上车点，请及时与司机会合。', variables: '{orderNo}' },
+  { endpoint: '乘客端', group: '行程', node: '行程已开始', triggerAt: '订单进入行程中状态后', content: '订单 {orderNo} 行程已开始，祝您旅途愉快。', variables: '{orderNo}' },
+  { endpoint: '乘客端', group: '行程', node: '行程已结束', triggerAt: '司机确认送达后', content: '订单 {orderNo} 已完成，感谢使用有米出行。', variables: '{orderNo}' },
+  { endpoint: '乘客端', group: '退款', node: '退款已受理', triggerAt: '退款申请创建后', content: '订单 {orderNo} 的退款 {refundAmount} 已受理。' },
+  { endpoint: '乘客端', group: '退款', node: '退款已到账', triggerAt: '支付渠道返回退款成功后', content: '订单 {orderNo} 的退款 {refundAmount} 已到账。' },
+  { endpoint: '乘客端', group: '营销', node: '优惠券到账', triggerAt: '优惠券发放成功后', content: '您获得一张 {couponName}，有效期至 {expireAt}。', variables: '{couponName}、{expireAt}' },
+  { endpoint: '乘客端', group: '营销', node: '优惠券即将过期', triggerAt: '优惠券到期前', content: '您的优惠券 {couponName} 即将过期，请及时使用。', variables: '{couponName}、{expireAt}', disabled: true },
+]
+
+const driverSystemMessageSeeds: SystemMessageSeed[] = [
+  { endpoint: '司导端', group: '认证', node: '资料审核通过', triggerAt: '首次认证或资料修改审核通过后', content: '您的认证资料已审核通过。' },
+  { endpoint: '司导端', group: '认证', node: '资料审核驳回', triggerAt: '认证资料审核驳回后', content: '您的认证资料未通过，请根据审核意见重新提交。' },
+  { endpoint: '司导端', group: '认证', node: 'Stripe 入驻提醒', triggerAt: '司机认证通过但未完成 Stripe 入驻时', content: '请完成 Stripe Express 入驻，以便后续接收结算。' },
+  { endpoint: '司导端', group: '认证', node: 'Stripe 认证通过', triggerAt: 'Stripe 账户验证完成后', content: '您的 Stripe 账户已认证通过。' },
+  { endpoint: '司导端', group: '认证', node: 'Stripe 认证受限', triggerAt: 'Stripe 账户能力受限时', content: '您的 Stripe 账户当前受限，请按提示补充资料。' },
+  { endpoint: '司导端', group: '认证', node: '信息修改审核结果', triggerAt: '个人或车辆信息修改审核结束后', content: '您的信息修改审核已完成，请查看审核结果。' },
+  { endpoint: '司导端', group: '派单', node: '收到订单指派', triggerAt: '调度向司机指派订单后', content: '收到新订单 {orderNo}，请在 60 秒内确认。', variables: '{orderNo}、{departureAt}' },
+  { endpoint: '司导端', group: '派单', node: '指派已失效', triggerAt: '司机未在时限内确认指派', content: '订单 {orderNo} 的指派已失效。', variables: '{orderNo}' },
+  { endpoint: '司导端', group: '派单', node: '抢单成功', triggerAt: '司机从订单池抢单成功后', content: '您已成功抢到订单 {orderNo}。', variables: '{orderNo}' },
+  { endpoint: '司导端', group: '派单', node: '订单被改派', triggerAt: '平台将已指派订单改派给其他司机后', content: '订单 {orderNo} 已被平台改派。', variables: '{orderNo}' },
+  { endpoint: '司导端', group: '订单', node: '订单已取消', triggerAt: '关联订单取消后', content: '订单 {orderNo} 已取消，请查看订单详情。', variables: '{orderNo}' },
+  { endpoint: '司导端', group: '订单', node: '订单信息变更', triggerAt: '乘客、路线或时间等信息变更后', content: '订单 {orderNo} 信息已更新，请重新确认。', variables: '{orderNo}' },
+  { endpoint: '司导端', group: '行程', node: '行程即将开始', triggerAt: '订单出发时间临近时', content: '订单 {orderNo} 即将开始，请提前做好出发准备。', variables: '{orderNo}、{departureAt}' },
+  { endpoint: '司导端', group: '行程', node: '乘客尾款未付', triggerAt: '出发前乘客仍未支付尾款时', content: '订单 {orderNo} 仍有乘客尾款未付，请等待平台处理。', variables: '{orderNo}' },
+  { endpoint: '司导端', group: '结算', node: '结算已到账', triggerAt: 'Stripe Transfer 成功后', content: '订单 {orderNo} 的结算 {settleAmount} 已到账。' },
+  { endpoint: '司导端', group: '结算', node: '结算异常', triggerAt: 'Stripe Transfer 连续失败后', content: '订单 {orderNo} 结算 {settleAmount} 暂未成功，平台财务正在处理。', disabled: true },
+  { endpoint: '司导端', group: '资质', node: '证件即将到期', triggerAt: '证件到期日前进入提醒窗口', content: '您的 {documentName} 即将到期，请及时更新。', variables: '{documentName}、{expireAt}' },
+  { endpoint: '司导端', group: '资质', node: '证件已过期', triggerAt: '证件超过有效期后', content: '您的 {documentName} 已过期，相关接单权限将受限。', variables: '{documentName}' },
+  { endpoint: '司导端', group: '账户', node: '接单权限变更', triggerAt: '后台开启或关闭接单权限后', content: '您的接单权限已变更为：{permissionStatus}。' },
+  { endpoint: '司导端', group: '账户', node: '订单池权限变更', triggerAt: '后台开启或关闭订单池权限后', content: '您的订单池权限已变更为：{permissionStatus}。' },
+  { endpoint: '司导端', group: '运营', node: '平台公告', triggerAt: '运营公告发布至司导端后', content: '平台发布了新公告，请前往公告中心查看。' },
+  { endpoint: '司导端', group: '运营', node: '意见反馈已处理', triggerAt: '意见反馈工单处理完成后', content: '您提交的意见反馈已处理，请查看处理结果。' },
+]
+
+function buildSystemMessageRows(): ModuleRow[] {
+  return [...passengerSystemMessageSeeds, ...driverSystemMessageSeeds].map((item, index) => ({
+    id: `SM-${item.endpoint === '乘客端' ? 'P' : 'D'}-${String(item.endpoint === '乘客端' ? index + 1 : index - passengerSystemMessageSeeds.length + 1).padStart(3, '0')}`,
+    endpoint: item.endpoint,
+    group: item.group,
+    node: item.node,
+    triggerAt: item.triggerAt,
+    content: item.content,
+    variables: item.variables ?? '无',
+    status: item.disabled ? '禁用' : '启用',
+  }))
+}
 
 export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
   coupons: {
     kind: 'table',
     eyebrow: 'MARKETING / COUPONS',
     description: '维护优惠券面值、适用服务和有效期，并控制定向发放节奏；抵扣由平台承担，不冲减司机分账基数。',
+    showDescription: false,
+    showInsight: false,
     insight: {
       label: '核销洞察',
       title: '拼车折扣券核销效率最高',
@@ -24,7 +106,8 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     ],
     columns: [
       { key: 'id', label: '券 ID', kind: 'mono', width: '132px' },
-      { key: 'name', label: '优惠券', kind: 'primary', secondaryKey: 'couponType', width: '180px' },
+      { key: 'couponType', label: '券类型', kind: 'status', width: '92px' },
+      { key: 'name', label: '券名', kind: 'primary', width: '180px' },
       { key: 'content', label: '优惠内容' },
       { key: 'maxDiscount', label: '最高抵扣' },
       { key: 'service', label: '使用服务' },
@@ -33,10 +116,10 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', kind: 'status' },
     ],
     rows: [
-      { id: 'CPN-260801', name: '新客接机立减 £8', couponType: '满减', content: '满 £50 减 £8', maxDiscount: '—', service: '独享', validity: '2026-08-01 — 2026-09-30', redemption: '846 / 2,000', status: '启用' },
-      { id: 'CPN-260805', name: '拼车夏日九折', couponType: '折扣', content: '9 折', maxDiscount: '£12', service: '拼车', validity: '2026-08-05 — 2026-08-31', redemption: '1,290 / 3,000', status: '启用' },
-      { id: 'CPN-260612', name: '机场夜航补贴', couponType: '满减', content: '满 £80 减 £10', maxDiscount: '—', service: '独享', validity: '2026-06-12 — 2026-08-31', redemption: '612 / 1,500', status: '禁用' },
-      { id: 'CPN-260701', name: '老友回归礼', couponType: '折扣', content: '8.8 折', maxDiscount: '£15', service: '拼车', validity: '2026-07-01 — 2026-09-15', redemption: '438 / 800', status: '启用' },
+      { id: 'CPN-260801', name: '新客接机立减 £8', couponType: '满减', thresholdAmount: 50, discountAmount: 8, discountRate: null, maxDiscountAmount: null, content: '满 £50 减 £8', maxDiscount: '—', service: '独享', validFrom: '2026-08-01', validTo: '2026-09-30', validity: '2026-08-01 — 2026-09-30', totalQuantity: 2500, issuedQuantity: 2000, redeemedQuantity: 846, redemption: '846 / 2,000', status: '启用' },
+      { id: 'CPN-260805', name: '拼车夏日九折', couponType: '折扣', thresholdAmount: null, discountAmount: null, discountRate: 9, maxDiscountAmount: 12, content: '9 折', maxDiscount: '£12', service: '拼车', validFrom: '2026-08-05', validTo: '2026-08-31', validity: '2026-08-05 — 2026-08-31', totalQuantity: 3600, issuedQuantity: 3000, redeemedQuantity: 1290, redemption: '1,290 / 3,000', status: '启用' },
+      { id: 'CPN-260612', name: '机场夜航补贴', couponType: '满减', thresholdAmount: 80, discountAmount: 10, discountRate: null, maxDiscountAmount: null, content: '满 £80 减 £10', maxDiscount: '—', service: '独享', validFrom: '2026-06-12', validTo: '2026-08-31', validity: '2026-06-12 — 2026-08-31', totalQuantity: 1500, issuedQuantity: 1500, redeemedQuantity: 612, redemption: '612 / 1,500', status: '禁用' },
+      { id: 'CPN-260701', name: '老友回归礼', couponType: '折扣', thresholdAmount: null, discountAmount: null, discountRate: 8.8, maxDiscountAmount: 15, content: '8.8 折', maxDiscount: '£15', service: '拼车', validFrom: '2026-07-01', validTo: '2026-09-15', validity: '2026-07-01 — 2026-09-15', totalQuantity: 1000, issuedQuantity: 800, redeemedQuantity: 438, redemption: '438 / 800', status: '启用' },
     ],
     primaryAction: '新增优惠券',
     secondaryAction: '定向发放',
@@ -49,6 +132,8 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'MARKETING / GRANT RECORDS',
     description: '按单张券码追踪优惠券的领取来源、持有用户和订单核销结果。',
+    showDescription: false,
+    showInsight: false,
     insight: {
       label: '发放提醒',
       title: '今日活动发放量较昨日上升 18%',
@@ -68,10 +153,13 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', options: ['全部', '未核销', '已核销', '已过期'] },
     ],
     columns: [
+      { key: 'couponId', label: '券 ID', kind: 'mono', width: '132px' },
       { key: 'code', label: '券码', kind: 'mono', width: '156px' },
-      { key: 'couponName', label: '优惠券', kind: 'primary', secondaryKey: 'couponId', width: '176px' },
+      { key: 'couponType', label: '券类型', kind: 'status', width: '92px' },
+      { key: 'couponName', label: '券名', kind: 'primary', width: '176px' },
       { key: 'content', label: '优惠内容' },
-      { key: 'service', label: '服务' },
+      { key: 'service', label: '使用服务' },
+      { key: 'validity', label: '有效期范围', width: '184px' },
       { key: 'holder', label: '持有用户', secondaryKey: 'phone', width: '172px' },
       { key: 'source', label: '获取方式' },
       { key: 'grantedAt', label: '发放时间', width: '136px' },
@@ -79,13 +167,12 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', kind: 'status' },
     ],
     rows: [
-      { id: 'GR-260818-0821', code: 'C260818000821', couponId: 'CPN-260801', couponName: '新客接机立减 £8', couponType: '满减', content: '满 £50 减 £8', service: '独享', validity: '2026-08-01 — 2026-09-30', holder: 'U-10842 · 林诗雨', phone: '+44 7402 518 093', source: '活动', grantedAt: '08-18 09:12', orderId: '—', status: '未核销' },
-      { id: 'GR-260817-0736', code: 'C260817000736', couponId: 'CPN-260805', couponName: '拼车夏日九折', couponType: '折扣', content: '9 折 / 最高 £12', service: '拼车', validity: '2026-08-05 — 2026-08-31', holder: 'U-10631 · 周行远', phone: '+44 7721 996 420', source: '系统', grantedAt: '08-17 18:26', orderId: 'YO-260818-11082', status: '已核销' },
-      { id: 'GR-260715-0219', code: 'C260715000219', couponId: 'CPN-260701', couponName: '老友回归礼', couponType: '折扣', content: '8.8 折 / 最高 £15', service: '拼车', validity: '2026-07-01 — 2026-09-15', holder: 'U-09218 · 王睿', phone: '+44 7988 302 662', source: '活动', grantedAt: '07-15 11:40', orderId: '—', status: '已过期' },
-      { id: 'GR-260816-0684', code: 'C260816000684', couponId: 'CPN-260612', couponName: '机场夜航补贴', couponType: '满减', content: '满 £80 减 £10', service: '独享', validity: '2026-06-12 — 2026-08-31', holder: 'U-10492 · 陈予安', phone: '+44 7508 117 840', source: '系统', grantedAt: '08-16 20:05', orderId: '—', status: '未核销' },
+      { id: 'GR-260818-0821', code: 'C260818000821', couponId: 'CPN-260801', couponName: '新客接机立减 £8', couponType: '满减', content: '满 £50 减 £8', service: '独享', validFrom: '2026-08-01', validTo: '2026-09-30', validity: '2026-08-01 — 2026-09-30', holder: 'U-10842 · 林诗雨', phone: '+44 7402 518 093', source: '活动', grantedDate: '2026-08-18', grantedAt: '2026-08-18 09:12', orderId: '—', status: '未核销' },
+      { id: 'GR-260817-0736', code: 'C260817000736', couponId: 'CPN-260805', couponName: '拼车夏日九折', couponType: '折扣', content: '9 折 / 最高 £12', service: '拼车', validFrom: '2026-08-05', validTo: '2026-08-31', validity: '2026-08-05 — 2026-08-31', holder: 'U-10631 · 周行远', phone: '+44 7721 996 420', source: '系统', grantedDate: '2026-08-17', grantedAt: '2026-08-17 18:26', orderId: 'YO-260818-11082', status: '已核销' },
+      { id: 'GR-260715-0219', code: 'C260715000219', couponId: 'CPN-260701', couponName: '老友回归礼', couponType: '折扣', content: '8.8 折 / 最高 £15', service: '拼车', validFrom: '2026-07-01', validTo: '2026-09-15', validity: '2026-07-01 — 2026-09-15', holder: 'U-09218 · 王睿', phone: '+44 7988 302 662', source: '活动', grantedDate: '2026-07-15', grantedAt: '2026-07-15 11:40', orderId: '—', status: '已过期' },
+      { id: 'GR-260816-0684', code: 'C260816000684', couponId: 'CPN-260612', couponName: '机场夜航补贴', couponType: '满减', content: '满 £80 减 £10', service: '独享', validFrom: '2026-06-12', validTo: '2026-08-31', validity: '2026-06-12 — 2026-08-31', holder: 'U-10492 · 陈予安', phone: '+44 7508 117 840', source: '系统', grantedDate: '2026-08-16', grantedAt: '2026-08-16 20:05', orderId: '—', status: '未核销' },
     ],
     secondaryAction: '导出发放记录',
-    rowAction: { label: '查看详情', mode: 'notify', tone: 'info' },
     canCreate: false,
     canEdit: false,
   },
@@ -94,6 +181,9 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'MARKETING / CAMPAIGNS',
     description: '配置首次 APP 登录和分享奖励活动，控制关联优惠券与有效周期。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '防刷状态',
       title: '设备标识拦截 43 次重复触发',
@@ -120,10 +210,10 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', kind: 'status' },
     ],
     rows: [
-      { id: 'ACT-260801', name: '新用户首次登录礼', campaignType: '新用户奖励', coupon: '新客接机立减 £8', validity: '2026-08-01 — 09-30', triggered: '1,538', granted: '1,506', status: '进行中' },
-      { id: 'ACT-260815', name: '好友分享接机季', campaignType: '分享奖励', coupon: '拼车夏日九折', validity: '2026-09-01 — 10-31', triggered: '—', granted: '—', status: '待开始' },
-      { id: 'ACT-260501', name: '春季新客礼', campaignType: '新用户奖励', coupon: '春季立减券', validity: '2026-05-01 — 06-30', triggered: '3,824', granted: '3,701', status: '已结束' },
-      { id: 'ACT-260710', name: '分享返券灰度', campaignType: '分享奖励', coupon: '老友回归礼', validity: '2026-07-15 — 08-15', triggered: '608', granted: '577', status: '下架' },
+      { id: 'ACT-260801', name: '新用户首次登录礼', campaignType: '新用户优惠券奖励', couponId: 'CPN-260801', coupon: '新客接机立减 £8', validFrom: '2026-08-01', validTo: '2026-09-30', validity: '2026-08-01 — 2026-09-30', triggerRule: '首次 APP 登录成功', recipient: '新用户本人', triggered: '1,538', granted: '1,506', status: '进行中' },
+      { id: 'ACT-260815', name: '好友分享接机季', campaignType: '分享优惠券奖励', couponId: 'CPN-260805', coupon: '拼车夏日九折', validFrom: '2026-09-01', validTo: '2026-10-31', validity: '2026-09-01 — 2026-10-31', triggerRule: '被分享者首次 APP 登录成功', recipient: '分享者', triggered: '—', granted: '—', status: '进行中' },
+      { id: 'ACT-260501', name: '春季新客礼', campaignType: '新用户优惠券奖励', couponId: 'CPN-SPRING', coupon: '春季立减券', validFrom: '2026-05-01', validTo: '2026-06-30', validity: '2026-05-01 — 2026-06-30', triggerRule: '首次 APP 登录成功', recipient: '新用户本人', triggered: '3,824', granted: '3,701', status: '已结束' },
+      { id: 'ACT-260710', name: '分享返券灰度', campaignType: '分享优惠券奖励', couponId: 'CPN-260701', coupon: '老友回归礼', validFrom: '2026-07-15', validTo: '2026-08-15', validity: '2026-07-15 — 2026-08-15', triggerRule: '被分享者首次 APP 登录成功', recipient: '分享者', triggered: '608', granted: '577', status: '下架' },
     ],
     primaryAction: '新增活动',
     secondaryAction: '查看触发记录',
@@ -136,6 +226,9 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'OPERATIONS / VALUE-ADDED SERVICES',
     description: '管理乘客下单时可选的增值服务；费用独立记录，并计入订单分账基数。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '服务表现',
       title: '儿童座椅选购率连续两周提升',
@@ -159,9 +252,9 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', kind: 'status' },
     ],
     rows: [
-      { id: 'VAS-001', name: '举接机牌', description: '到达大厅持定制姓名牌等候', fee: 8, ordersToday: 29, sort: 1, status: '启用' },
-      { id: 'VAS-002', name: '儿童座椅', description: '符合英国标准的儿童安全座椅', fee: 12, ordersToday: 52, sort: 2, status: '启用' },
-      { id: 'VAS-003', name: '礼宾服装', description: '司机按礼宾正装标准提供服务', fee: 20, ordersToday: 0, sort: 3, status: '禁用' },
+      { id: 'VAS-001', name: '举接机牌', description: '到达大厅持定制姓名牌等候', fee: 8, ordersToday: 29, sort: 1, serviceMode: '线下服务', businessLinked: false, status: '启用' },
+      { id: 'VAS-002', name: '儿童座椅', description: '符合英国标准的儿童安全座椅', fee: 12, ordersToday: 52, sort: 2, serviceMode: '业务关联服务', businessLinked: true, status: '启用' },
+      { id: 'VAS-003', name: '礼宾服装', description: '司机按礼宾正装标准提供服务', fee: 20, ordersToday: 0, sort: 3, serviceMode: '线下服务', businessLinked: false, status: '禁用' },
     ],
     primaryAction: '新增服务',
     secondaryAction: '调整排序',
@@ -174,6 +267,9 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'OPERATIONS / BANNERS',
     description: '按发布端配置运营 Banner，支持定时生效、链接跳转与展示排序。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '排期提醒',
       title: '开学季 Banner 将于 9 月 1 日上线',
@@ -193,7 +289,7 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     columns: [
       { key: 'id', label: 'ID', kind: 'mono', width: '112px' },
       { key: 'name', label: 'Banner', kind: 'primary', secondaryKey: 'description', width: '235px' },
-      { key: 'image', label: '图片规格' },
+      { key: 'image', label: 'Banner 图片', kind: 'image', width: '180px' },
       { key: 'channel', label: '发布端' },
       { key: 'jumpType', label: '跳转类型' },
       { key: 'validity', label: '生效时间', width: '172px' },
@@ -201,10 +297,10 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', kind: 'status' },
     ],
     rows: [
-      { id: 'BN-260801', name: '希思罗接机季', description: '暑期接机优惠', image: '1440 × 480', channel: '小程序 + APP', jumpType: '链接跳转', validity: '2026-08-01 — 08-31', sort: 1, status: '启用' },
-      { id: 'BN-260812', name: '拼车新线路上线', description: '伦敦至剑桥拼车', image: '1440 × 480', channel: 'APP', jumpType: '链接跳转', validity: '2026-08-12 — 09-30', sort: 2, status: '启用' },
-      { id: 'BN-260901', name: '开学季出行礼', description: '新生专属优惠券', image: '1440 × 480', channel: '小程序 + APP', jumpType: '链接跳转', validity: '2026-09-01 — 09-20', sort: 3, status: '待生效' },
-      { id: 'BN-260601', name: '春季品牌页', description: '品牌形象宣传', image: '1440 × 480', channel: '小程序', jumpType: '无跳转', validity: '2026-06-01 — 06-30', sort: 4, status: '禁用' },
+      { id: 'BN-260801', name: '希思罗接机季', description: '暑期接机优惠', image: bannerImage('希思罗接机季', '落地伦敦，轻松出发', '#0b2440', '#285a78'), channel: '小程序 + APP', jumpType: '链接跳转', jumpUrl: '/booking/airport-transfer', validFrom: '2026-08-01', validTo: '2026-08-31', validity: '2026-08-01 — 2026-08-31', sort: 1, status: '启用' },
+      { id: 'BN-260812', name: '拼车新线路上线', description: '伦敦至剑桥拼车', image: bannerImage('拼车新线路', '伦敦 ↔ 剑桥，现已开放', '#17324d', '#377c6b'), channel: 'APP', jumpType: '链接跳转', jumpUrl: '/carpool/routes/RT-LHR-CBG', validFrom: '2026-08-12', validTo: '2026-09-30', validity: '2026-08-12 — 2026-09-30', sort: 2, status: '启用' },
+      { id: 'BN-260901', name: '开学季出行礼', description: '新生专属优惠券', image: bannerImage('开学季出行礼', '新生专属优惠，即将上线', '#40204f', '#9f4d6d'), channel: '小程序 + APP', jumpType: '链接跳转', jumpUrl: '/campaigns/freshers', validFrom: '2026-09-01', validTo: '2026-09-20', validity: '2026-09-01 — 2026-09-20', sort: 3, status: '待生效' },
+      { id: 'BN-260601', name: '春季品牌页', description: '品牌形象宣传', image: bannerImage('春日英伦行', '和有米一起发现更多', '#1f513f', '#83a957'), channel: '小程序', jumpType: '无跳转', jumpUrl: '', validFrom: '2026-06-01', validTo: '2026-06-30', validity: '2026-06-01 — 2026-06-30', sort: 4, status: '禁用' },
     ],
     primaryAction: '新增 Banner',
     secondaryAction: '预览发布端',
@@ -217,6 +313,9 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'OPERATIONS / NOTICES',
     description: '向小程序、乘客端和司导端定时发布差异化运营公告。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '发布提醒',
       title: '机场接车点调整公告正在双端生效',
@@ -235,17 +334,18 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     ],
     columns: [
       { key: 'id', label: 'ID', kind: 'mono', width: '112px' },
-      { key: 'title', label: '公告标题', kind: 'primary', secondaryKey: 'subtitle', width: '260px' },
-      { key: 'channel', label: '发布端' },
-      { key: 'validity', label: '生效时间', width: '178px' },
-      { key: 'summary', label: '内容摘要', width: '230px' },
+      { key: 'channel', label: '发布端', width: '140px' },
+      { key: 'title', label: '公告标题', kind: 'primary', secondaryKey: 'subtitle', width: '245px' },
+      { key: 'validity', label: '生效时间范围', width: '196px' },
+      { key: 'content', label: '富文本内容', width: '280px' },
+      { key: 'sort', label: '排序', width: '72px' },
       { key: 'status', label: '状态', kind: 'status' },
     ],
     rows: [
-      { id: 'NT-260818', title: '希思罗机场接车点调整', subtitle: 'T3 接车区临时迁移', channel: '乘客 + 小程序', validity: '2026-08-18 — 08-25', summary: '请前往 Car Park 3 指定区域候车…', status: '启用' },
-      { id: 'NT-260816', title: '周末道路管制提醒', subtitle: '伦敦市中心部分道路封闭', channel: '司导', validity: '2026-08-16 — 08-19', summary: '请提前规划绕行路线并关注实时路况…', status: '启用' },
-      { id: 'NT-260901', title: '系统维护通知', subtitle: '9 月 2 日凌晨短时维护', channel: '乘客 + 司导', validity: '2026-09-01 — 09-03', summary: '预计维护 30 分钟，进行中订单不受影响…', status: '待生效' },
-      { id: 'NT-260701', title: '夏季服务说明', subtitle: '高峰期请预留等候时间', channel: '乘客', validity: '2026-07-01 — 07-31', summary: '机场高峰时段预计增加 15 分钟等候…', status: '禁用' },
+      { id: 'NT-260818', title: '希思罗机场接车点调整', subtitle: 'T3 接车区临时迁移', channel: '小程序 + 乘客', validFrom: '2026-08-18', validTo: '2026-08-25', validity: '2026-08-18 — 2026-08-25', content: '因机场临时交通调整，T3 航站楼接车点迁移至 Car Park 3。请乘客根据订单页指引前往指定区域候车。', sort: 1, status: '启用' },
+      { id: 'NT-260816', title: '周末道路管制提醒', subtitle: '伦敦市中心部分道路封闭', channel: '司导', validFrom: '2026-08-16', validTo: '2026-08-19', validity: '2026-08-16 — 2026-08-19', content: '周末伦敦市中心部分道路将实施临时管制，请司导提前规划绕行路线，并在出发前关注实时路况。', sort: 2, status: '启用' },
+      { id: 'NT-260901', title: '系统维护通知', subtitle: '9 月 2 日凌晨短时维护', channel: '小程序 + 乘客 + 司导', validFrom: '2026-09-01', validTo: '2026-09-03', validity: '2026-09-01 — 2026-09-03', content: '系统将于 9 月 2 日 02:00–02:30 进行维护。维护期间部分页面可能短暂不可用，进行中订单不受影响。', sort: 3, status: '待生效' },
+      { id: 'NT-260701', title: '夏季服务说明', subtitle: '高峰期请预留等候时间', channel: '乘客', validFrom: '2026-07-01', validTo: '2026-07-31', validity: '2026-07-01 — 2026-07-31', content: '暑期机场客流增加，高峰时段预计增加约 15 分钟等候时间。请提前准备行李并保持手机畅通。', sort: 4, status: '禁用' },
     ],
     primaryAction: '新增公告',
     secondaryAction: '预览公告',
@@ -255,9 +355,12 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
   },
 
   'carpool-copy': {
-    kind: 'settings',
+    kind: 'table',
     eyebrow: 'OPERATIONS / CARPOOL COPY',
     description: '维护拼车群内乘客与司导可发送的固定模板语，按生效端和行程节点隔离。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '模板规则',
       title: '模板按“生效端 + 节点”双维度生效',
@@ -269,123 +372,72 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '司导端', value: '12', note: '覆盖 2 个节点' },
       { label: '今日发送', value: '1,284', note: '群聊模板消息', tone: 'success' },
     ],
-    primaryAction: '保存默认语',
-    secondaryAction: '新增模板',
-    settings: [
-      {
-        title: '乘客端 · 拼车成功',
-        description: '成团后至进入待出发节点前，乘客可选择的固定消息。',
-        fields: [
-          { key: 'passenger-grouped-copy', label: '模板内容', value: '大家好，很高兴与各位同行。', type: 'textarea', help: '模板 ID CC-001 · 排序 1' },
-          { key: 'passenger-grouped-order', label: '展示排序', value: '1', type: 'number' },
-          { key: 'passenger-grouped-enabled', label: '启用模板', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '乘客端 · 待出发',
-        description: '司机接单后至车辆出发前展示。',
-        fields: [
-          { key: 'passenger-waiting-copy', label: '模板内容', value: '我已到达约定上车点。', type: 'textarea', help: '模板 ID CC-006 · 排序 1' },
-          { key: 'passenger-waiting-order', label: '展示排序', value: '1', type: 'number' },
-          { key: 'passenger-waiting-enabled', label: '启用模板', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '乘客端 · 行程中',
-        description: '乘客确认上车后至行程结束前展示。',
-        fields: [
-          { key: 'passenger-trip-copy', label: '模板内容', value: '麻烦在下一个安全位置停车，谢谢。', type: 'textarea', help: '模板 ID CC-012 · 排序 3' },
-          { key: 'passenger-trip-order', label: '展示排序', value: '3', type: 'number' },
-          { key: 'passenger-trip-enabled', label: '启用模板', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '司导端 · 待出发',
-        description: '司导确认接单后至点击已出发前展示。',
-        fields: [
-          { key: 'driver-waiting-copy', label: '模板内容', value: '您好，我已出发前往接车点。', type: 'textarea', help: '模板 ID CC-018 · 排序 1' },
-          { key: 'driver-waiting-order', label: '展示排序', value: '1', type: 'number' },
-          { key: 'driver-waiting-enabled', label: '启用模板', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '司导端 · 行程中',
-        description: '司导开始行程后至确认送达前展示。',
-        fields: [
-          { key: 'driver-trip-copy', label: '模板内容', value: '前方道路拥堵，预计晚到 10 分钟。', type: 'textarea', help: '模板 ID CC-024 · 排序 2' },
-          { key: 'driver-trip-order', label: '展示排序', value: '2', type: 'number' },
-          { key: 'driver-trip-enabled', label: '启用模板', value: false, type: 'switch' },
-        ],
-      },
+    searchPlaceholder: '搜索模板内容',
+    filters: [
+      { key: 'endpoint', label: '生效端', options: ['全部', '乘客端', '司导端'] },
+      { key: 'node', label: '节点', options: ['全部', '拼车成功', '待出发', '行程中'] },
+      { key: 'status', label: '状态', options: ['全部', '启用', '禁用'] },
     ],
+    columns: [
+      { key: 'id', label: 'ID', kind: 'mono', width: '105px' },
+      { key: 'endpoint', label: '生效端', kind: 'status', width: '90px' },
+      { key: 'node', label: '节点', width: '100px' },
+      { key: 'content', label: '内容', kind: 'primary', width: '360px' },
+      { key: 'sort', label: '排序', width: '72px' },
+      { key: 'status', label: '状态', kind: 'status', width: '88px' },
+    ],
+    rows: [
+      { id: 'CC-001', endpoint: '乘客端', node: '拼车成功', content: '大家好，很高兴与各位同行。', sort: 1, status: '启用' },
+      { id: 'CC-002', endpoint: '乘客端', node: '拼车成功', content: '您好，我会准时到达集合点。', sort: 2, status: '启用' },
+      { id: 'CC-006', endpoint: '乘客端', node: '待出发', content: '我已到达约定上车点。', sort: 1, status: '启用' },
+      { id: 'CC-007', endpoint: '乘客端', node: '待出发', content: '我正在前往上车点，请稍等。', sort: 2, status: '启用' },
+      { id: 'CC-012', endpoint: '乘客端', node: '行程中', content: '麻烦在下一个安全位置停车，谢谢。', sort: 1, status: '启用' },
+      { id: 'CC-013', endpoint: '乘客端', node: '行程中', content: '车内温度可以调整一下吗？', sort: 2, status: '禁用' },
+      { id: 'CC-018', endpoint: '司导端', node: '待出发', content: '您好，我已出发前往接车点。', sort: 1, status: '启用' },
+      { id: 'CC-019', endpoint: '司导端', node: '待出发', content: '我已到达，请在约定上车点等候。', sort: 2, status: '启用' },
+      { id: 'CC-024', endpoint: '司导端', node: '行程中', content: '前方道路拥堵，预计晚到 10 分钟。', sort: 1, status: '启用' },
+      { id: 'CC-025', endpoint: '司导端', node: '行程中', content: '我们将在下一个安全地点短暂停靠。', sort: 2, status: '禁用' },
+    ],
+    primaryAction: '新增模板',
+    rowAction: { label: '启用 / 禁用', mode: 'toggle', activeStatus: '启用', inactiveStatus: '禁用', tone: 'coral' },
     canCreate: true,
     canEdit: true,
   },
 
   'system-messages': {
-    kind: 'settings',
+    kind: 'table',
     eyebrow: 'OPERATIONS / SYSTEM MESSAGES',
     description: '配置系统埋点触发的乘客端与司导端通知文案、推送渠道和启停状态。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '节点约束',
       title: '发送节点由系统维护，运营不可新增',
-      description: '当前乘客端 24 个节点、司导端 22 个节点，运营仅可编辑文案与启停。',
+      description: '当前乘客端 24 个节点、司导端 22 个节点，运营可编辑文案、插入系统变量并自行启停。',
     },
     metrics: [
-      { label: '系统节点', value: '46', note: '全部预置', tone: 'brand' },
+      { label: '消息模板', value: '46', note: '对应 46 个预置节点', tone: 'brand' },
       { label: '乘客端', value: '24', note: '启用 23 个' },
       { label: '司导端', value: '22', note: '启用 21 个' },
       { label: '今日送达率', value: '98.7%', note: '四渠道合计', tone: 'success' },
     ],
-    primaryAction: '保存消息设置',
-    secondaryAction: '查看发送节点',
-    settings: [
-      {
-        title: '乘客端 · 全款支付成功',
-        description: '独享订单全款到账后立即发送。',
-        fields: [
-          { key: 'passenger-paid-copy', label: '通知文案', value: '您的订单 {orderNo} 已支付成功。', type: 'textarea', help: '支持变量：{orderNo}、{amount}' },
-          { key: 'passenger-paid-channel', label: '推送渠道', value: 'APP 内 + 系统推送', type: 'select', options: ['APP 内推送', 'APP 内 + 系统推送', 'APP 内 + 短信', '微信模板消息'] },
-          { key: 'passenger-paid-enabled', label: '启用节点', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '乘客端 · 尾款待付',
-        description: '指派司机并锁定价格后通知乘客支付尾款。',
-        fields: [
-          { key: 'passenger-balance-copy', label: '通知文案', value: '司机已确认，请于出发前完成订单 {orderNo} 的尾款支付。', type: 'textarea', help: '支持变量：{orderNo}、{balance}' },
-          { key: 'passenger-balance-channel', label: '推送渠道', value: 'APP 内 + 系统推送', type: 'select', options: ['APP 内推送', 'APP 内 + 系统推送', 'APP 内 + 短信', '微信模板消息'] },
-          { key: 'passenger-balance-enabled', label: '启用节点', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '乘客端 · 优惠券到账',
-        description: '活动发放或后台定向发放成功后发送。',
-        fields: [
-          { key: 'passenger-coupon-copy', label: '通知文案', value: '您获得一张 {couponName}，有效期至 {expireAt}，请及时使用。', type: 'textarea', help: '支持变量：{couponName}、{expireAt}' },
-          { key: 'passenger-coupon-channel', label: '推送渠道', value: 'APP 内推送', type: 'select', options: ['APP 内推送', 'APP 内 + 系统推送', 'APP 内 + 短信', '微信模板消息'] },
-          { key: 'passenger-coupon-enabled', label: '启用节点', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '司导端 · 收到订单指派',
-        description: '调度指派订单后发送，包含 60 秒确认时限。',
-        fields: [
-          { key: 'driver-dispatch-copy', label: '通知文案', value: '收到新订单 {orderNo}，请在 60 秒内确认。', type: 'textarea', help: '支持变量：{orderNo}、{departureAt}' },
-          { key: 'driver-dispatch-channel', label: '推送渠道', value: 'APP 内 + 系统推送', type: 'select', options: ['APP 内推送', 'APP 内 + 系统推送', 'APP 内 + 短信'] },
-          { key: 'driver-dispatch-enabled', label: '启用节点', value: true, type: 'switch' },
-        ],
-      },
-      {
-        title: '司导端 · 结算异常',
-        description: 'Stripe Transfer 连续三次失败后发送。',
-        fields: [
-          { key: 'driver-settlement-failed-copy', label: '通知文案', value: '订单 {orderNo} 结算暂未成功，平台财务正在处理。', type: 'textarea', help: '支持变量：{orderNo}、{amount}' },
-          { key: 'driver-settlement-failed-channel', label: '推送渠道', value: 'APP 内 + 系统推送', type: 'select', options: ['APP 内推送', 'APP 内 + 系统推送', 'APP 内 + 短信'] },
-          { key: 'driver-settlement-failed-enabled', label: '启用节点', value: false, type: 'switch' },
-        ],
-      },
+    searchPlaceholder: '搜索消息内容',
+    filters: [
+      { key: 'endpoint', label: '发布端', options: ['全部', '乘客端', '司导端'] },
+      { key: 'group', label: '节点分组', options: ['全部', '账号', '支付', '拼车', '派单', '行程', '退款', '营销', '认证', '订单', '结算', '资质', '账户', '运营'] },
+      { key: 'node', label: '发送节点', options: ['全部', ...passengerSystemMessageSeeds.map((item) => item.node), ...driverSystemMessageSeeds.map((item) => item.node)] },
+      { key: 'status', label: '状态', options: ['全部', '启用', '禁用'] },
     ],
+    columns: [
+      { key: 'id', label: 'ID', kind: 'mono', width: '105px' },
+      { key: 'endpoint', label: '发布端', kind: 'status', width: '90px' },
+      { key: 'node', label: '发送节点', kind: 'primary', secondaryKey: 'group', width: '170px' },
+      { key: 'content', label: '内容', width: '390px' },
+      { key: 'status', label: '状态', kind: 'status', width: '88px' },
+    ],
+    rows: buildSystemMessageRows(),
+    rowAction: { label: '启用 / 禁用', mode: 'toggle', activeStatus: '启用', inactiveStatus: '禁用', tone: 'coral' },
     canCreate: false,
     canEdit: true,
   },
@@ -394,6 +446,8 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'FINANCE / ORDER SETTLEMENTS',
     description: '按订单核对乘客实付、平台抽佣与司机应得，并处理失败的 Stripe Transfer。',
+    showDescription: false,
+    showInsight: false,
     insight: {
       label: '口径说明',
       title: '平台收入与司机结算必须分区查看',
@@ -405,11 +459,8 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '结算中金额', value: '£12,486.20', note: '司机结算口径', tone: 'warning', filter: { key: 'status', value: '结算中' } },
       { label: '结算失败', value: '£2,418.80', note: '7 笔待财务重试', tone: 'danger', filter: { key: 'status', value: '失败' } },
     ],
-    searchPlaceholder: '搜索订单 ID、司机姓名或手机号',
-    filters: [
-      { key: 'period', label: '统计时间', options: ['全部', '今日', '本周', '本月'] },
-      { key: 'status', label: '状态', options: ['全部', '结算中', '已结算', '失败'] },
-    ],
+    searchPlaceholder: '按订单 ID、司机名称、手机号和结算时间筛选',
+    filters: [],
     columns: [
       { key: 'id', label: '订单 ID', kind: 'mono', width: '155px' },
       { key: 'driver', label: '司机', kind: 'primary', secondaryKey: 'phone', width: '166px' },
@@ -436,6 +487,9 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'FINANCE / DRIVER STATEMENTS',
     description: '按司机与所选统计周期聚合订单、抽佣和实发金额，支持穿透至订单明细。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '对账状态',
       title: '本月 86 名司机产生结算',
@@ -447,11 +501,8 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '订单金额', value: '£92,684', note: '所选时间范围' },
       { label: '实发金额', value: '£72,906', note: '已扣平台抽佣', tone: 'success' },
     ],
-    searchPlaceholder: '搜索司机 ID、姓名或手机号',
-    filters: [
-      { key: 'period', label: '统计时间', options: ['全部', '今日', '本周', '本月'] },
-      { key: 'settlementState', label: '对账状态', options: ['全部', '正常', '存在失败结算'] },
-    ],
+    searchPlaceholder: '按司机 ID、司机名称、手机号和最近结算时间筛选',
+    filters: [],
     columns: [
       { key: 'id', label: '司导 ID', kind: 'mono', width: '112px' },
       { key: 'driver', label: '司导', kind: 'primary', secondaryKey: 'phone', width: '176px' },
@@ -463,10 +514,42 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'settlementState', label: '对账状态', kind: 'status' },
     ],
     rows: [
-      { id: 'D-00821', driver: '张远航', phone: '+44 7700 901 182', completedOrders: 38, orderAmount: 2846, commission: 421.2, paidAmount: 2318.8, lastSettledAt: '2026-08-18 16:30', period: '本月', settlementState: '正常', status: '正常' },
-      { id: 'D-00418', driver: '李屹', phone: '+44 7700 904 316', completedOrders: 31, orderAmount: 2394, commission: 351.9, paidAmount: 1948.1, lastSettledAt: '2026-08-18 09:42', period: '本月', settlementState: '正常', status: '正常' },
-      { id: 'D-00692', driver: '陈默', phone: '+44 7700 906 825', completedOrders: 27, orderAmount: 2126, commission: 309.3, paidAmount: 1728.7, lastSettledAt: '2026-08-17 21:15', period: '本月', settlementState: '存在失败结算', status: '存在失败结算' },
-      { id: 'D-00273', driver: '赵衡', phone: '+44 7700 902 738', completedOrders: 22, orderAmount: 1684, commission: 243.6, paidAmount: 1356.4, lastSettledAt: '2026-08-16 14:08', period: '本月', settlementState: '正常', status: '正常' },
+      {
+        id: 'D-00821', driver: '张远航', phone: '+44 7700 901 182', completedOrders: 38, orderAmount: 2846, commission: 421.2, paidAmount: 2318.8, lastSettledAt: '2026-08-18 16:30', period: '本月', settlementState: '正常', status: '正常',
+        settlementDetails: [
+          { orderId: 'YO-260816-10805', totalAmount: 118, tripFee: 92, depositAmount: 20, addOnFee: 6, couponAmount: 8, commission: 18.9, driverAmount: 107.1, settledAt: '2026-08-16 20:18', status: '已结算' },
+          { orderId: 'YO-260818-11082', totalAmount: 128, tripFee: 98, depositAmount: 20, addOnFee: 10, couponAmount: 12, commission: 21, driverAmount: 119, settledAt: '2026-08-18 16:30', status: '结算中' },
+          { orderId: 'YO-260817-10941', totalAmount: 176, tripFee: 144, depositAmount: 20, addOnFee: 12, couponAmount: 10, commission: 27.9, driverAmount: 158.1, settledAt: '2026-08-17 18:42', status: '已结算' },
+          { orderId: 'YO-260815-10726', totalAmount: 96, tripFee: 76, depositAmount: 20, addOnFee: 0, couponAmount: 0, commission: 14.4, driverAmount: 81.6, settledAt: '2026-08-15 17:06', status: '已结算' },
+        ],
+      },
+      {
+        id: 'D-00418', driver: '李屹', phone: '+44 7700 904 316', completedOrders: 31, orderAmount: 2394, commission: 351.9, paidAmount: 1948.1, lastSettledAt: '2026-08-18 09:42', period: '本月', settlementState: '正常', status: '正常',
+        settlementDetails: [
+          { orderId: 'YO-260816-10832', totalAmount: 142, tripFee: 110, depositAmount: 20, addOnFee: 12, couponAmount: 0, commission: 21.3, driverAmount: 120.7, settledAt: '2026-08-16 22:05', status: '已结算' },
+          { orderId: 'YO-260818-11047', totalAmount: 186, tripFee: 154, depositAmount: 20, addOnFee: 12, couponAmount: 14, commission: 30, driverAmount: 170, settledAt: '2026-08-18 09:42', status: '已结算' },
+          { orderId: 'YO-260817-10968', totalAmount: 104, tripFee: 84, depositAmount: 20, addOnFee: 0, couponAmount: 8, commission: 16.8, driverAmount: 95.2, settledAt: '2026-08-17 14:26', status: '已结算' },
+          { orderId: 'YO-260815-10753', totalAmount: 208, tripFee: 168, depositAmount: 20, addOnFee: 20, couponAmount: 15, commission: 33.45, driverAmount: 189.55, settledAt: '2026-08-15 19:31', status: '已结算' },
+        ],
+      },
+      {
+        id: 'D-00692', driver: '陈默', phone: '+44 7700 906 825', completedOrders: 27, orderAmount: 2126, commission: 309.3, paidAmount: 1728.7, lastSettledAt: '2026-08-17 21:15', period: '本月', settlementState: '存在失败结算', status: '存在失败结算',
+        settlementDetails: [
+          { orderId: 'YO-260815-10782', totalAmount: 132, tripFee: 100, depositAmount: 20, addOnFee: 12, couponAmount: 10, commission: 21.3, driverAmount: 120.7, settledAt: '2026-08-15 16:48', status: '已结算' },
+          { orderId: 'YO-260817-10992', totalAmount: 242, tripFee: 202, depositAmount: 20, addOnFee: 20, couponAmount: 18, commission: 39, driverAmount: 221, settledAt: '2026-08-17 21:15', status: '失败' },
+          { orderId: 'YO-260816-10876', totalAmount: 158, tripFee: 126, depositAmount: 20, addOnFee: 12, couponAmount: 0, commission: 23.7, driverAmount: 134.3, settledAt: '2026-08-16 13:12', status: '已结算' },
+          { orderId: 'YO-260814-10691', totalAmount: 88, tripFee: 68, depositAmount: 20, addOnFee: 0, couponAmount: 6, commission: 14.1, driverAmount: 79.9, settledAt: '2026-08-14 11:35', status: '已结算' },
+        ],
+      },
+      {
+        id: 'D-00273', driver: '赵衡', phone: '+44 7700 902 738', completedOrders: 22, orderAmount: 1684, commission: 243.6, paidAmount: 1356.4, lastSettledAt: '2026-08-16 14:08', period: '本月', settlementState: '正常', status: '正常',
+        settlementDetails: [
+          { orderId: 'YO-260814-10642', totalAmount: 114, tripFee: 82, depositAmount: 20, addOnFee: 12, couponAmount: 8, commission: 18.3, driverAmount: 103.7, settledAt: '2026-08-14 17:54', status: '已结算' },
+          { orderId: 'YO-260816-10824', totalAmount: 96, tripFee: 76, depositAmount: 20, addOnFee: 0, couponAmount: 0, commission: 14.4, driverAmount: 81.6, settledAt: '2026-08-16 14:08', status: '已结算' },
+          { orderId: 'YO-260815-10761', totalAmount: 164, tripFee: 132, depositAmount: 20, addOnFee: 12, couponAmount: 12, commission: 26.4, driverAmount: 149.6, settledAt: '2026-08-15 12:22', status: '已结算' },
+          { orderId: 'YO-260813-10598', totalAmount: 208, tripFee: 168, depositAmount: 20, addOnFee: 20, couponAmount: 15, commission: 33.45, driverAmount: 189.55, settledAt: '2026-08-13 20:03', status: '已结算' },
+        ],
+      },
     ],
     secondaryAction: '导出司机对账',
     rowAction: { label: '查看结算明细', mode: 'notify', tone: 'info' },
@@ -478,6 +561,9 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     kind: 'table',
     eyebrow: 'SERVICE / FEEDBACK',
     description: '集中处理乘客与司导提交的产品、支付和服务问题，并跟踪工单状态。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '处理效率',
       title: '今日平均首次响应 18 分钟',
@@ -490,36 +576,36 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '今日完结', value: '19', note: '完结率 82.6%', tone: 'success', filter: { key: 'status', value: '已完结' } },
     ],
     searchPlaceholder: '搜索反馈 ID、内容或联系方式',
-    filters: [
-      { key: 'feedbackType', label: '反馈类型', options: ['全部', '功能异常', '支付问题', '司机服务', '乘客投诉', '产品建议', '其他'] },
-      { key: 'identity', label: '提交人身份', options: ['全部', '乘客', '司导'] },
-      { key: 'status', label: '处理状态', options: ['全部', '待处理', '已接收', '处理中', '已完结'] },
-    ],
+    filters: [],
     columns: [
       { key: 'id', label: '反馈 ID', kind: 'mono', width: '144px' },
-      { key: 'feedbackType', label: '反馈类型' },
-      { key: 'content', label: '反馈内容', kind: 'primary', secondaryKey: 'attachments', width: '315px' },
+      { key: 'feedbackType', label: '反馈类型', width: '160px' },
+      { key: 'content', label: '反馈内容', kind: 'primary', width: '300px' },
+      { key: 'attachments', label: '图片', width: '86px' },
       { key: 'contact', label: '联系方式', width: '176px' },
       { key: 'submittedAt', label: '提交时间', width: '142px' },
-      { key: 'identity', label: '身份' },
+      { key: 'identity', label: '提交人身份' },
       { key: 'status', label: '处理状态', kind: 'status' },
     ],
     rows: [
-      { id: 'FB-260818-042', feedbackType: '支付问题', content: '银行卡已扣款但订单仍显示待支付', attachments: '2 张图片', contact: '+44 7402 518 093', submittedAt: '2026-08-18 10:32', identity: '乘客', status: '待处理' },
-      { id: 'FB-260818-038', feedbackType: '司机服务', content: '司机未在约定接车点等候', attachments: '1 张图片', contact: 'shiyu.lin@example.co.uk', submittedAt: '2026-08-18 09:05', identity: '乘客', status: '已接收' },
-      { id: 'FB-260817-126', feedbackType: '功能异常', content: '司导端无法滑动开始行程', attachments: '无附件', contact: '+44 7700 901 182', submittedAt: '2026-08-17 21:18', identity: '司导', status: '处理中' },
-      { id: 'FB-260817-119', feedbackType: '产品建议', content: '希望增加常用地址收藏', attachments: '无附件', contact: '+44 7721 996 420', submittedAt: '2026-08-17 16:44', identity: '乘客', status: '已完结' },
-      { id: 'FB-260816-104', feedbackType: '乘客投诉', content: '乘客携带超额行李但未提前说明', attachments: '3 张图片', contact: '+44 7700 904 316', submittedAt: '2026-08-16 18:20', identity: '司导', status: '已完结' },
+      { id: 'FB-260818-042', userId: 'U-10842', submitter: '林诗雨', feedbackType: '支付、退款与费用', content: '银行卡已扣款但订单仍显示待支付，重新进入页面后状态仍未更新。', attachments: '2 张', attachmentCount: 2, contact: '+44 7402 518 093', submittedAt: '2026-08-18 10:32', identity: '乘客', status: '待处理' },
+      { id: 'FB-260818-038', userId: 'U-10631', submitter: '周行远', feedbackType: '司机与车辆服务', content: '司机未在约定接车点等候，电话联系后表示停在另一侧停车区。', attachments: '1 张', attachmentCount: 1, contact: 'shiyu.lin@example.co.uk', submittedAt: '2026-08-18 09:05', identity: '乘客', status: '已接收' },
+      { id: 'FB-260817-126', userId: 'D-00821', submitter: '张远航', feedbackType: '行程与接送问题', content: '司导端到达接车点后无法滑动开始行程，重启 APP 后仍无法操作。', attachments: '无', attachmentCount: 0, contact: '+44 7700 901 182', submittedAt: '2026-08-17 21:18', identity: '司导', status: '处理中' },
+      { id: 'FB-260817-119', userId: 'U-10572', submitter: '许诺', feedbackType: '功能建议与使用体验', content: '希望增加常用地址收藏，并可在下单时快速选择学校和住址。', attachments: '无', attachmentCount: 0, contact: '+44 7721 996 420', submittedAt: '2026-08-17 16:44', identity: '乘客', status: '已完结' },
+      { id: 'FB-260816-104', userId: 'D-00418', submitter: '李屹', feedbackType: '下单与订单问题', content: '乘客携带超额行李但未提前说明，车辆后备箱无法容纳全部行李。', attachments: '3 张', attachmentCount: 3, contact: '+44 7700 904 316', submittedAt: '2026-08-16 18:20', identity: '司导', status: '已完结' },
     ],
     rowAction: { label: '推进处理状态', mode: 'advance', nextStatus: '处理中', completedLabel: '已完结', tone: 'info' },
     canCreate: false,
-    canEdit: true,
+    canEdit: false,
   },
 
   'exception-orders': {
     kind: 'table',
     eyebrow: 'SERVICE / EXCEPTION ORDERS',
     description: '按“订单 + 异常乘客”粒度处理司机上报的问题和可退款金额。',
+    showDescription: false,
+    showInsight: false,
+    showSecondaryAction: false,
     insight: {
       label: '资金提示',
       title: '待处理金额 £486.50',
@@ -532,30 +618,31 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { label: '本周处理率', value: '82.4%', note: '较上周 +5.2pp', tone: 'success' },
     ],
     searchPlaceholder: '搜索订单号、乘客姓名/手机号或司机姓名',
-    filters: [
-      { key: 'serviceType', label: '服务类型', options: ['全部', '拼车', '独享'] },
-      { key: 'status', label: '处理状态', options: ['全部', '待处理', '已处理'] },
-    ],
+    filters: [],
     columns: [
       { key: 'id', label: '订单号', kind: 'mono', width: '154px' },
-      { key: 'route', label: '路线', kind: 'primary', secondaryKey: 'departureAt', width: '220px' },
-      { key: 'party', label: '乘客 / 行李' },
-      { key: 'business', label: '业务 / 服务' },
-      { key: 'passenger', label: '异常乘客', secondaryKey: 'phone', width: '160px' },
+      { key: 'route', label: '路线', kind: 'primary', width: '210px' },
+      { key: 'departureAt', label: '出发时间', width: '142px' },
+      { key: 'party', label: '乘客 / 行李', width: '110px' },
+      { key: 'business', label: '业务 / 服务', width: '112px' },
+      { key: 'addOns', label: '增值服务', kind: 'primary', secondaryKey: 'addOnAmount', width: '160px' },
       { key: 'orderAmount', label: '订单金额', kind: 'currency' },
+      { key: 'orderStatus', label: '订单状态', kind: 'status' },
+      { key: 'passenger', label: '异常乘客', kind: 'primary', secondaryKey: 'phone', width: '160px' },
+      { key: 'driver', label: '司机', kind: 'primary', secondaryKey: 'driverId', width: '120px' },
+      { key: 'exceptionReason', label: '异常原因', width: '110px' },
+      { key: 'reportedAt', label: '上报时间', width: '142px' },
       { key: 'pendingAmount', label: '待处理金额', kind: 'currency' },
       { key: 'status', label: '处理状态', kind: 'status' },
     ],
     rows: [
-      { id: 'YO-260818-11021', route: '希思罗 → 伦敦一区', departureAt: '2026-08-18 14:30', party: '1 人 / 2 件', business: '接机 / 拼车', serviceType: '拼车', passenger: '林诗雨', phone: '+44 7402 518 093', orderAmount: 68, pendingAmount: 68, status: '待处理' },
-      { id: 'YO-260818-10994', route: '伦敦一区 → 盖特威克', departureAt: '2026-08-18 11:10', party: '2 人 / 3 件', business: '送机 / 独享', serviceType: '独享', passenger: '周行远', phone: '+44 7721 996 420', orderAmount: 126, pendingAmount: 126, status: '待处理' },
-      { id: 'YO-260817-10876', route: '曼彻斯特机场 → 市中心', departureAt: '2026-08-17 20:40', party: '1 人 / 1 件', business: '接机 / 拼车', serviceType: '拼车', passenger: '陈予安', phone: '+44 7508 117 840', orderAmount: 54.5, pendingAmount: 54.5, status: '已处理' },
-      { id: 'YO-260817-10842', route: '希思罗 → 剑桥', departureAt: '2026-08-17 17:00', party: '1 人 / 2 件', business: '接机 / 独享', serviceType: '独享', passenger: '王睿', phone: '+44 7988 302 662', orderAmount: 148, pendingAmount: 92, status: '已处理' },
+      { id: 'YO-260818-11021', route: '希思罗 → 伦敦一区', routeId: 'RT-LHR-Z1', departureAt: '2026-08-18 14:30', party: '1 人 / 2 件', passengerCount: 1, luggageCount: 2, business: '接机 / 拼车', businessType: '接机', serviceType: '拼车', addOns: '儿童座椅 × 1', addOnAmount: '£12.00', passenger: '林诗雨', passengerId: 'U-10842', phone: '+44 7402 518 093', driver: '张远航', driverId: 'D-00821', driverPhone: '+44 7700 901 182', exceptionReason: '乘客未出现', reportedAt: '2026-08-18 15:36', orderAmount: 68, depositAmount: 20, balanceAmount: 36, addOnFee: 12, pendingAmount: 68, orderStatus: '已挂起', status: '待处理' },
+      { id: 'YO-260818-10994', route: '伦敦一区 → 盖特威克', routeId: 'RT-Z1-LGW', departureAt: '2026-08-18 11:10', party: '2 人 / 3 件', passengerCount: 2, luggageCount: 3, business: '送机 / 独享', businessType: '送机', serviceType: '独享', addOns: '举接机牌 × 1', addOnAmount: '£8.00', passenger: '周行远', passengerId: 'U-10631', phone: '+44 7721 996 420', driver: '李屹', driverId: 'D-00418', driverPhone: '+44 7700 904 316', exceptionReason: '航班取消', reportedAt: '2026-08-18 12:18', orderAmount: 126, depositAmount: 20, balanceAmount: 98, addOnFee: 8, pendingAmount: 126, orderStatus: '已挂起', status: '待处理' },
+      { id: 'YO-260817-10876', route: '曼彻斯特机场 → 市中心', routeId: 'RT-MAN-CTR', departureAt: '2026-08-17 20:40', party: '1 人 / 1 件', passengerCount: 1, luggageCount: 1, business: '接机 / 拼车', businessType: '接机', serviceType: '拼车', addOns: '无', addOnAmount: '£0.00', passenger: '陈予安', passengerId: 'U-10492', phone: '+44 7508 117 840', driver: '陈默', driverId: 'D-00692', driverPhone: '+44 7700 906 825', exceptionReason: '航班延误', reportedAt: '2026-08-17 21:48', orderAmount: 54.5, depositAmount: 20, balanceAmount: 34.5, addOnFee: 0, pendingAmount: 54.5, orderStatus: '已退款', resolution: '人工退款', refundAmount: 54.5, refundReason: '航班延误', handledAt: '2026-08-17 22:06', status: '已处理' },
+      { id: 'YO-260817-10842', route: '希思罗 → 剑桥', routeId: 'RT-LHR-CBG', departureAt: '2026-08-17 17:00', party: '1 人 / 2 件', passengerCount: 1, luggageCount: 2, business: '接机 / 独享', businessType: '接机', serviceType: '独享', addOns: '儿童座椅 × 1', addOnAmount: '£12.00', passenger: '王睿', passengerId: 'U-09218', phone: '+44 7988 302 662', driver: '赵衡', driverId: 'D-00273', driverPhone: '+44 7700 902 738', exceptionReason: '其他', reportedAt: '2026-08-17 18:12', orderAmount: 148, depositAmount: 20, balanceAmount: 116, addOnFee: 12, pendingAmount: 92, orderStatus: '已挂起', resolution: '取消退款', refundAmount: 0, handledAt: '2026-08-17 18:45', status: '已处理' },
     ],
-    secondaryAction: '导出异常订单',
-    rowAction: { label: '处理退款', mode: 'advance', nextStatus: '已处理', completedLabel: '已处理', tone: 'warning' },
     canCreate: false,
-    canEdit: true,
+    canEdit: false,
   },
 
   roles: {

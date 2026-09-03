@@ -148,6 +148,29 @@ export interface OrderNote {
   createdAt: string
 }
 
+export interface OrderTrackPoint {
+  x: number
+  y: number
+  recordedAt: string
+}
+
+export interface OrderRouteTelemetry {
+  startGeofence: string
+  endGeofence: string
+  trackingStartedAt?: string
+  trackingEndedAt?: string
+  driverPoints: OrderTrackPoint[]
+}
+
+export interface OrderGroupMessage {
+  id: string
+  author: string
+  role: '乘客' | '司导' | '系统'
+  content: string
+  createdAt: string
+  readAt?: string
+}
+
 export interface Order {
   id: string
   routeId?: string
@@ -196,6 +219,8 @@ export interface Order {
   }
   notes: OrderNote[]
   tags: string[]
+  routeTelemetry?: OrderRouteTelemetry
+  groupMessages?: OrderGroupMessage[]
 }
 
 export interface DriverCandidate {
@@ -223,6 +248,7 @@ export type DriverReviewStatus = '待审核' | '已通过' | '已驳回'
 export interface DriverAudit {
   id: string
   userId: string
+  driverId: string
   name: string
   englishName: string
   phone: string

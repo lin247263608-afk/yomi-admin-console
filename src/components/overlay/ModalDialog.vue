@@ -5,6 +5,7 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 defineProps<{
   title: string
   eyebrow?: string
+  size?: 'default' | 'wide'
 }>()
 
 const emit = defineEmits<{
@@ -134,7 +135,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <div class="overlay" @click.self="emit('close')"></div>
     <div class="modal-wrap" @click.self="emit('close')">
-      <section ref="dialog" class="modal" role="dialog" aria-modal="true" :aria-label="title" tabindex="-1" data-focus-trap-overlay>
+      <section ref="dialog" class="modal" :class="{ 'modal--wide': size === 'wide' }" role="dialog" aria-modal="true" :aria-label="title" tabindex="-1" data-focus-trap-overlay>
         <header class="modal__header">
           <div>
             <div v-if="eyebrow" class="page-header__eyebrow">{{ eyebrow }}</div>

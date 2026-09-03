@@ -104,14 +104,14 @@ onUnmounted(() => {
             {{ option.label }}
           </button>
         </div>
-        <button class="btn btn--primary" type="button" :disabled="isRefreshing" @click="refreshDashboard()">
+        <button class="btn btn--refresh" type="button" :disabled="isRefreshing" @click="refreshDashboard()">
           <RefreshCw :size="15" :class="{ 'is-spinning': isRefreshing }" />
           刷新全部
         </button>
       </div>
     </header>
 
-    <section class="dashboard-hero dark-panel">
+    <section class="dashboard-hero dark-panel stats-banner stats-banner--dark">
       <div class="dashboard-hero__metrics">
         <div>
           <span>全订单总量</span>
