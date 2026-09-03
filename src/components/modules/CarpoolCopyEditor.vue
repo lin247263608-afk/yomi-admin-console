@@ -2,6 +2,7 @@
 import { AlertTriangle, Check, Info } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
@@ -11,16 +12,24 @@ const emit = defineEmits<{ close: []; save: [row: ModuleRow] }>()
 const endpoint = ref('乘客端')
 const node = ref('拼车成功')
 const content = ref('')
+const contentEn = ref('')
+const contentLanguage = ref<ContentLanguage>('zh')
 const sort = ref('1')
 const validationError = ref('')
 const nodeOptions = computed(() => endpoint.value === '乘客端'
   ? ['拼车成功', '待出发', '行程中']
   : ['待出发', '行程中'])
+const activeContent = computed({
+  get: () => contentLanguage.value === 'zh' ? content.value : contentEn.value,
+  set: (value: string) => { if (contentLanguage.value === 'zh') content.value = value; else contentEn.value = value },
+})
 
 function initialize() {
   endpoint.value = String(props.row?.endpoint ?? '乘客端')
   node.value = String(props.row?.node ?? '拼车成功')
   content.value = String(props.row?.content ?? '')
+  contentEn.value = String(props.row?.contentEn ?? '')
+  contentLanguage.value = 'zh'
   sort.value = String(props.row?.sort ?? 1)
   validationError.value = ''
 }
@@ -32,8 +41,10 @@ watch(endpoint, () => {
 
 function save() {
   const copy = content.value.trim()
+  const copyEn = contentEn.value.trim()
   const sortValue = Number(sort.value)
   if (!copy) validationError.value = '请输入模板内容。'
+  else if (!copyEn) validationError.value = '请输入英文模板内容。'
   else if (!Number.isInteger(sortValue) || sortValue < 0) validationError.value = '排序必须是大于或等于 0 的整数。'
   else if (props.rows.some((item) => item.id !== props.row?.id
     && item.endpoint === endpoint.value
@@ -48,6 +59,7 @@ function save() {
     endpoint: endpoint.value,
     node: node.value,
     content: copy,
+    contentEn: copyEn,
     sort: sortValue,
     status: String(props.row?.status ?? '禁用'),
   })
@@ -57,6 +69,7 @@ function save() {
 <template>
   <ModalDialog :title="row ? `编辑默认语 · ${row.id}` : '新增默认语'" eyebrow="CARPOOL COPY EDITOR" size="wide" @close="emit('close')">
     <section class="copy-editor-note"><Info :size="17" /><div><strong>模板按“生效端 + 节点”独立生效</strong><p>新增模板默认禁用，可保存后从列表启用。行程结束后拼车团关闭，不再允许发送模板消息。</p></div></section>
+    <ContentLanguageTabs v-model="contentLanguage" />
     <div class="copy-editor-grid">
       <section class="copy-editor-card">
         <header><span>应用范围</span><small>决定模板在哪一端、哪个行程阶段出现</small></header>
@@ -67,9 +80,9 @@ function save() {
         </div>
       </section>
       <section class="copy-editor-card copy-editor-card--content">
-        <header><span>模板内容 <em>*</em></span><small>{{ content.length }} / 200</small></header>
-        <textarea v-model="content" maxlength="200" autofocus placeholder="请输入拼车团内可快捷发送的固定话术"></textarea>
-        <div class="copy-preview"><small>发送预览</small><p>{{ content.trim() || '模板内容会在这里预览。' }}</p></div>
+        <header><span>{{ contentLanguage === 'zh' ? '模板内容（中文）' : 'Template content (English)' }} <em>*</em></span><small>{{ activeContent.length }} / 200</small></header>
+        <textarea v-model="activeContent" maxlength="200" autofocus :placeholder="contentLanguage === 'zh' ? '请输入拼车团内可快捷发送的固定话术' : 'Enter the English quick reply shown in the App'"></textarea>
+        <div class="copy-preview"><small>{{ contentLanguage === 'zh' ? '发送预览' : 'Message preview' }}</small><p>{{ activeContent.trim() || (contentLanguage === 'zh' ? '模板内容会在这里预览。' : 'The English template preview appears here.') }}</p></div>
       </section>
     </div>
     <p v-if="validationError" class="copy-editor-error"><AlertTriangle :size="15" />{{ validationError }}</p>

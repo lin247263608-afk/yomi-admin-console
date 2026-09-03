@@ -1,25 +1,32 @@
 <script setup lang="ts">
 import { ExternalLink, Pencil } from '@lucide/vue'
+import { computed, ref } from 'vue'
 
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
-defineProps<{ row: ModuleRow }>()
+const props = defineProps<{ row: ModuleRow }>()
 const emit = defineEmits<{ close: []; edit: [] }>()
+const contentLanguage = ref<ContentLanguage>('zh')
+const localized = computed(() => contentLanguage.value === 'en'
+  ? { name: String(props.row.nameEn ?? '待配置 English Banner 名称'), description: String(props.row.descriptionEn ?? '待配置 English Banner 描述'), image: String(props.row.imageEn ?? props.row.image ?? '') }
+  : { name: String(props.row.name ?? '—'), description: String(props.row.description ?? '—'), image: String(props.row.image ?? '') })
 </script>
 
 <template>
   <ModalDialog :title="`Banner 详情 · ${row.id}`" eyebrow="BANNER DETAIL" size="wide" @close="emit('close')">
-    <section class="banner-preview"><img :src="String(row.image ?? '')" :alt="`${String(row.name)} Banner`" /><div><span>{{ row.channel }}</span><strong>{{ row.name }}</strong><p>{{ row.description }}</p></div></section>
+    <section class="banner-preview"><img :src="localized.image" :alt="`${localized.name} Banner`" /><div><span>{{ row.channel }}</span><strong>{{ localized.name }}</strong><p>{{ localized.description }}</p></div></section>
+    <ContentLanguageTabs v-model="contentLanguage" compact />
 
     <div class="banner-detail-grid">
       <div><span>Banner ID</span><strong class="mono">{{ row.id }}</strong></div>
       <div><span>发布端</span><strong>{{ row.channel }}</strong></div>
       <div><span>排序</span><strong class="mono">{{ row.sort ?? '—' }}</strong></div>
       <div><span>状态</span><StatusBadge :label="String(row.status ?? '—')" :tone="row.status === '启用' ? 'success' : row.status === '待生效' ? 'warning' : 'danger'" dot /></div>
-      <div class="banner-detail-grid__wide"><span>Banner 名称</span><strong>{{ row.name }}</strong></div>
-      <div class="banner-detail-grid__wide"><span>描述</span><strong>{{ row.description }}</strong></div>
+      <div class="banner-detail-grid__wide"><span>{{ contentLanguage === 'zh' ? 'Banner 名称（中文）' : 'Banner name (English)' }}</span><strong>{{ localized.name }}</strong></div>
+      <div class="banner-detail-grid__wide"><span>{{ contentLanguage === 'zh' ? '描述（中文）' : 'Description (English)' }}</span><strong>{{ localized.description }}</strong></div>
       <div><span>生效开始</span><strong class="mono">{{ row.validFrom }}</strong></div>
       <div><span>生效结束</span><strong class="mono">{{ row.validTo }}</strong></div>
       <div><span>跳转类型</span><strong>{{ row.jumpType }}</strong></div>

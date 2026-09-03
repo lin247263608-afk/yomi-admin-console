@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { LockKeyhole, Pencil, TicketCheck } from '@lucide/vue'
+import { computed, ref } from 'vue'
 
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
@@ -26,22 +28,27 @@ function money(value: unknown) {
 const issued = Number(props.row.issuedQuantity ?? 0)
 const redeemed = Number(props.row.redeemedQuantity ?? 0)
 const total = Number(props.row.totalQuantity ?? 0)
+const contentLanguage = ref<ContentLanguage>('zh')
+const localizedName = computed(() => contentLanguage.value === 'en'
+  ? String(props.row.nameEn ?? '待配置 English 券名')
+  : String(props.row.name ?? '—'))
 </script>
 
 <template>
   <ModalDialog :title="`优惠券详情 · ${row.id}`" eyebrow="COUPON DETAIL" size="wide" @close="emit('close')">
     <section class="coupon-detail-head">
       <div class="coupon-detail-head__icon"><TicketCheck :size="21" /></div>
-      <div><small>{{ row.couponType }} COUPON</small><h3>{{ row.name }}</h3><p>{{ row.content }} · 适用于{{ row.service }}服务</p></div>
+      <div><small>{{ row.couponType }} COUPON</small><h3>{{ localizedName }}</h3><p>{{ row.content }} · 适用于{{ row.service }}服务</p></div>
       <StatusBadge :label="String(row.status ?? '—')" :tone="row.status === '启用' ? 'success' : 'danger'" dot />
     </section>
+    <ContentLanguageTabs v-model="contentLanguage" compact />
 
     <section class="coupon-detail-section">
       <header><strong>优惠券规则</strong><small>字段与新增、编辑优惠券表单保持一致。</small></header>
       <div class="coupon-detail-grid">
         <div><span>券ID</span><strong class="mono">{{ row.id }}</strong></div>
         <div><span>券类型</span><strong>{{ row.couponType }}</strong></div>
-        <div class="coupon-detail-grid__wide"><span>券名</span><strong>{{ row.name }}</strong></div>
+        <div class="coupon-detail-grid__wide"><span>{{ contentLanguage === 'zh' ? '券名（中文）' : 'Coupon name (English)' }}</span><strong>{{ localizedName }}</strong></div>
         <template v-if="row.couponType === '满减'">
           <div><span>起用金额（满）</span><strong>{{ money(row.thresholdAmount) }}</strong></div>
           <div><span>抵扣金额</span><strong class="coupon-detail-accent">{{ money(row.discountAmount) }}</strong></div>

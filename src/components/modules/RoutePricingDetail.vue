@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Pencil } from '@lucide/vue'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
@@ -27,6 +28,10 @@ const vehiclePricing = computed(() => Array.isArray(props.row.vehiclePricing)
 const specialPeriods = computed(() => Array.isArray(props.row.specialPeriods)
   ? props.row.specialPeriods as SpecialPeriod[]
   : [])
+const contentLanguage = ref<ContentLanguage>('zh')
+const localizedName = computed(() => contentLanguage.value === 'en'
+  ? String(props.row.nameEn ?? '待配置 English 路线名称')
+  : String(props.row.name ?? '—'))
 
 function fenceLabel(id: unknown) {
   const fence = props.fences.find((item) => item.id === id)
@@ -64,7 +69,7 @@ function statusTone(value: unknown): BadgeTone {
     <section class="route-detail-summary">
       <div>
         <small>ROUTE OVERVIEW</small>
-        <h3>{{ row.name }}</h3>
+        <h3>{{ localizedName }}</h3>
         <p>{{ row.id }} · {{ row.fences }}</p>
       </div>
       <div class="route-detail-summary__badges">
@@ -74,12 +79,14 @@ function statusTone(value: unknown): BadgeTone {
       </div>
     </section>
 
+    <ContentLanguageTabs v-model="contentLanguage" compact />
+
     <section class="route-detail-section">
       <header>
         <div><strong>基础信息与定价</strong><small>与新增、编辑路线的字段顺序保持一致。</small></div>
       </header>
       <div class="route-detail-grid">
-        <div class="route-detail-field route-detail-field--wide"><span>路线名称</span><strong>{{ row.name }}</strong></div>
+        <div class="route-detail-field route-detail-field--wide"><span>{{ contentLanguage === 'zh' ? '路线名称（中文）' : 'Route name (English)' }}</span><strong>{{ localizedName }}</strong></div>
         <div><span>业务</span><strong>{{ row.business }}</strong></div>
         <div><span>路线ID</span><strong class="mono">{{ row.id }}</strong></div>
         <div class="route-detail-field route-detail-field--wide"><span>起点围栏</span><strong>{{ fenceLabel(row.startFenceId) }}</strong></div>

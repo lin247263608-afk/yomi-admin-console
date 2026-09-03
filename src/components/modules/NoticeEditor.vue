@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { AlertTriangle, Bold, Check, Info, Link, List, ListOrdered } from '@lucide/vue'
-import { nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
@@ -14,10 +15,18 @@ const channels = reactive<string[]>([])
 const validFrom = ref('')
 const validTo = ref('')
 const content = ref('')
+const titleEn = ref('')
+const subtitleEn = ref('')
+const contentEn = ref('')
+const contentLanguage = ref<ContentLanguage>('zh')
 const sort = ref('')
 const validationError = ref('')
 const contentInput = ref<HTMLTextAreaElement | null>(null)
 const channelOptions = ['小程序', '乘客', '司导']
+const activeContent = computed({
+  get: () => contentLanguage.value === 'zh' ? content.value : contentEn.value,
+  set: (value: string) => { if (contentLanguage.value === 'zh') content.value = value; else contentEn.value = value },
+})
 
 function initialize() {
   title.value = String(props.row?.title ?? '')
@@ -26,6 +35,10 @@ function initialize() {
   validFrom.value = String(props.row?.validFrom ?? '')
   validTo.value = String(props.row?.validTo ?? '')
   content.value = String(props.row?.content ?? '')
+  titleEn.value = String(props.row?.titleEn ?? '')
+  subtitleEn.value = String(props.row?.subtitleEn ?? '')
+  contentEn.value = String(props.row?.contentEn ?? '')
+  contentLanguage.value = 'zh'
   sort.value = props.row?.sort == null ? String(props.rows.length + 1) : String(props.row.sort)
   validationError.value = ''
 }
@@ -40,10 +53,10 @@ function toggleChannel(channel: string) {
 
 async function insertFormat(prefix: string, suffix = '') {
   const textarea = contentInput.value
-  const start = textarea?.selectionStart ?? content.value.length
+  const start = textarea?.selectionStart ?? activeContent.value.length
   const end = textarea?.selectionEnd ?? start
-  const selected = content.value.slice(start, end)
-  content.value = `${content.value.slice(0, start)}${prefix}${selected}${suffix}${content.value.slice(end)}`
+  const selected = activeContent.value.slice(start, end)
+  activeContent.value = `${activeContent.value.slice(0, start)}${prefix}${selected}${suffix}${activeContent.value.slice(end)}`
   await nextTick()
   textarea?.focus()
   textarea?.setSelectionRange(start + prefix.length, end + prefix.length)
@@ -53,6 +66,9 @@ function save() {
   const trimmedTitle = title.value.trim()
   const trimmedSubtitle = subtitle.value.trim()
   const trimmedContent = content.value.trim()
+  const trimmedTitleEn = titleEn.value.trim()
+  const trimmedSubtitleEn = subtitleEn.value.trim()
+  const trimmedContentEn = contentEn.value.trim()
   const sortValue = Number(sort.value)
 
   if (!trimmedTitle) validationError.value = '请输入公告标题。'
@@ -61,6 +77,8 @@ function save() {
   else if (!validFrom.value || !validTo.value) validationError.value = '请选择完整的生效时间范围。'
   else if (validFrom.value > validTo.value) validationError.value = '生效开始日期不能晚于结束日期。'
   else if (!trimmedContent) validationError.value = '请输入公告富文本内容。'
+  else if (!trimmedTitleEn) validationError.value = '请输入英文公告标题。'
+  else if (!trimmedContentEn) validationError.value = '请输入英文公告内容。'
   else if (!sort.value.trim() || !Number.isInteger(sortValue) || sortValue < 0) validationError.value = '排序必须是大于或等于 0 的整数。'
   else validationError.value = ''
   if (validationError.value) return
@@ -74,6 +92,9 @@ function save() {
     validTo: validTo.value,
     validity: `${validFrom.value} — ${validTo.value}`,
     content: trimmedContent,
+    titleEn: trimmedTitleEn,
+    subtitleEn: trimmedSubtitleEn || '—',
+    contentEn: trimmedContentEn,
     sort: sortValue,
     status: String(props.row?.status ?? '禁用'),
   })
@@ -83,13 +104,14 @@ function save() {
 <template>
   <ModalDialog :title="row ? `编辑公告 · ${row.id}` : '新增公告'" eyebrow="NOTICE EDITOR" size="wide" @close="emit('close')">
     <section class="notice-editor-note"><Info :size="17" /><div><strong>新增公告默认禁用</strong><p>保存后可从列表启用；开始日期未到时显示“待生效”。同一公告支持同时发布至小程序、乘客端和司导端。</p></div></section>
+    <ContentLanguageTabs v-model="contentLanguage" />
 
     <div class="notice-editor-layout">
       <section class="notice-editor-card">
         <header><span>基础信息</span><small>标题用于列表和公告入口展示</small></header>
         <div class="notice-form-grid">
-          <label class="notice-field notice-field--wide"><span>公告标题 <em>*</em></span><input v-model="title" class="field-control" type="text" maxlength="60" autofocus placeholder="请输入公告标题" /></label>
-          <label class="notice-field notice-field--wide"><span>副标题</span><input v-model="subtitle" class="field-control" type="text" maxlength="100" placeholder="请输入副标题" /></label>
+          <label class="notice-field notice-field--wide"><span>{{ contentLanguage === 'zh' ? '公告标题（中文）' : 'Notice title (English)' }} <em>*</em></span><input v-if="contentLanguage === 'zh'" v-model="title" class="field-control" type="text" maxlength="60" autofocus placeholder="请输入公告标题" /><input v-else v-model="titleEn" class="field-control" type="text" maxlength="100" placeholder="Enter the notice title" /></label>
+          <label class="notice-field notice-field--wide"><span>{{ contentLanguage === 'zh' ? '副标题（中文）' : 'Subtitle (English)' }}</span><input v-if="contentLanguage === 'zh'" v-model="subtitle" class="field-control" type="text" maxlength="100" placeholder="请输入副标题" /><input v-else v-model="subtitleEn" class="field-control" type="text" maxlength="160" placeholder="Enter the subtitle" /></label>
           <div class="notice-field notice-field--wide"><span>发布端 <em>*</em></span><div class="notice-channel-options"><button v-for="channel in channelOptions" :key="channel" type="button" :class="{ 'is-selected': channels.includes(channel) }" @click="toggleChannel(channel)">{{ channel }}</button></div><small>可多选；乘客与司导可在各自客户端查看公告</small></div>
           <label class="notice-field"><span>生效开始 <em>*</em></span><input v-model="validFrom" class="field-control" type="date" /></label>
           <label class="notice-field"><span>生效结束 <em>*</em></span><input v-model="validTo" class="field-control" type="date" /></label>
@@ -98,7 +120,7 @@ function save() {
       </section>
 
       <section class="notice-editor-card notice-editor-card--content">
-        <header><span>富文本内容 <em>*</em></span><small>{{ content.length }} / 3000</small></header>
+        <header><span>{{ contentLanguage === 'zh' ? '富文本内容（中文）' : 'Rich text content (English)' }} <em>*</em></span><small>{{ activeContent.length }} / 3000</small></header>
         <div class="notice-rich-editor">
           <div class="notice-rich-editor__toolbar" aria-label="富文本快捷工具">
             <button type="button" title="加粗" @click="insertFormat('**', '**')"><Bold :size="14" /></button>
@@ -106,7 +128,7 @@ function save() {
             <button type="button" title="有序列表" @click="insertFormat('\n1. ')"><ListOrdered :size="14" /></button>
             <button type="button" title="插入链接" @click="insertFormat('[链接文字](', ')')"><Link :size="14" /></button>
           </div>
-          <textarea ref="contentInput" v-model="content" maxlength="3000" placeholder="请输入公告正文，可使用工具栏快速插入强调、列表或链接。"></textarea>
+          <textarea ref="contentInput" v-model="activeContent" maxlength="3000" :placeholder="contentLanguage === 'zh' ? '请输入公告正文，可使用工具栏快速插入强调、列表或链接。' : 'Enter the English notice content shown in the App.'"></textarea>
         </div>
       </section>
     </div>

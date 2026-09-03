@@ -1,18 +1,25 @@
 <script setup lang="ts">
 import { MessageCircle, Pencil } from '@lucide/vue'
+import { computed, ref } from 'vue'
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
-defineProps<{ row: ModuleRow }>()
+const props = defineProps<{ row: ModuleRow }>()
 const emit = defineEmits<{ close: []; edit: [] }>()
+const contentLanguage = ref<ContentLanguage>('zh')
+const localizedContent = computed(() => contentLanguage.value === 'en'
+  ? String(props.row.contentEn ?? '待配置 English 默认语')
+  : String(props.row.content ?? '—'))
 </script>
 
 <template>
   <ModalDialog :title="`默认语详情 · ${row.id}`" eyebrow="CARPOOL COPY DETAIL" size="wide" @close="emit('close')">
-    <section class="copy-detail-hero"><span><MessageCircle :size="20" /></span><div><small>{{ row.endpoint }} / {{ row.node }}</small><h3>{{ row.content }}</h3><p>拼车团快捷消息模板</p></div><StatusBadge :label="String(row.status)" :tone="row.status === '启用' ? 'success' : 'danger'" dot /></section>
+    <section class="copy-detail-hero"><span><MessageCircle :size="20" /></span><div><small>{{ row.endpoint }} / {{ row.node }}</small><h3>{{ localizedContent }}</h3><p>拼车团快捷消息模板</p></div><StatusBadge :label="String(row.status)" :tone="row.status === '启用' ? 'success' : 'danger'" dot /></section>
+    <ContentLanguageTabs v-model="contentLanguage" compact />
     <div class="copy-detail-grid"><div><span>模板 ID</span><strong class="mono">{{ row.id }}</strong></div><div><span>生效端</span><strong>{{ row.endpoint }}</strong></div><div><span>节点</span><strong>{{ row.node }}</strong></div><div><span>排序</span><strong class="mono">{{ row.sort }}</strong></div></div>
-    <section class="copy-detail-content"><header><span>模板内容</span><small>客户端发送预览</small></header><div><MessageCircle :size="15" /><p>{{ row.content }}</p></div></section>
+    <section class="copy-detail-content"><header><span>{{ contentLanguage === 'zh' ? '模板内容（中文）' : 'Template content (English)' }}</span><small>客户端发送预览</small></header><div><MessageCircle :size="15" /><p>{{ localizedContent }}</p></div></section>
     <section class="copy-detail-rule"><strong>生效规则</strong><p>模板只在“{{ row.endpoint }} · {{ row.node }}”阶段展示；行程结束后拼车团自动关闭，历史消息仍保留用于客诉与纠纷核查。</p></section>
     <template #footer><button class="btn btn--secondary" type="button" @click="emit('close')">关闭</button><button class="btn btn--brand" type="button" @click="emit('edit')"><Pencil :size="14" />编辑模板</button></template>
   </ModalDialog>

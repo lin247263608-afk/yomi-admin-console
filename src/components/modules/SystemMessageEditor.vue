@@ -2,6 +2,7 @@
 import { AlertTriangle, Check, Info, TriangleAlert } from '@lucide/vue'
 import { computed, nextTick, ref, watch } from 'vue'
 
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 import {
@@ -16,6 +17,8 @@ import {
 const props = defineProps<{ row: ModuleRow }>()
 const emit = defineEmits<{ close: []; save: [row: ModuleRow] }>()
 const content = ref('')
+const contentEn = ref('')
+const contentLanguage = ref<ContentLanguage>('zh')
 const validationError = ref('')
 const contentInput = ref<HTMLTextAreaElement | null>(null)
 const isRiskNode = computed(() => ['支付', '退款', '结算', '认证'].includes(String(props.row.group ?? '')))
@@ -30,8 +33,12 @@ const variableGroups = computed(() => {
   return [...groups.entries()].map(([context, variables]) => ({ context, label: contextLabels[context], variables }))
 })
 const boundContextLabels = computed(() => (nodeContexts[String(props.row.node ?? '')] ?? []).map((context) => contextLabels[context]))
+const activeContent = computed({
+  get: () => contentLanguage.value === 'zh' ? content.value : contentEn.value,
+  set: (value: string) => { if (contentLanguage.value === 'zh') content.value = value; else contentEn.value = value },
+})
 const previewParts = computed(() => {
-  const source = content.value.trim()
+  const source = activeContent.value.trim()
   if (!source) return [{ text: '系统消息内容会在这里预览。', unknown: false }]
   const dictionary = new Map(messageVariables.map((variable) => [variable.key, variable]))
   const parts: Array<{ text: string; unknown: boolean }> = []
@@ -49,34 +56,41 @@ const previewParts = computed(() => {
 
 watch(() => props.row, () => {
   content.value = String(props.row.content ?? '')
+  contentEn.value = String(props.row.contentEn ?? '')
+  contentLanguage.value = 'zh'
   validationError.value = ''
 }, { immediate: true })
 
 async function insertVariable(key: string) {
   const textarea = contentInput.value
   const token = `{${key}}`
-  const start = textarea?.selectionStart ?? content.value.length
+  const start = textarea?.selectionStart ?? activeContent.value.length
   const end = textarea?.selectionEnd ?? start
-  content.value = `${content.value.slice(0, start)}${token}${content.value.slice(end)}`
+  activeContent.value = `${activeContent.value.slice(0, start)}${token}${activeContent.value.slice(end)}`
   await nextTick()
   textarea?.focus()
   textarea?.setSelectionRange(start + token.length, start + token.length)
 }
 
-function save() {
-  const copy = content.value.trim()
+function validateCopy(copy: string, languageLabel: string) {
   const usedKeys = extractMessageVariableKeys(copy)
   const dictionaryKeys = new Set(messageVariables.map((variable) => variable.key))
   const allowedKeys = new Set(availableVariables.value.map((variable) => variable.key))
   const unknownKey = usedKeys.find((key) => !dictionaryKeys.has(key))
   const unavailableKey = usedKeys.find((key) => dictionaryKeys.has(key) && !allowedKeys.has(key))
-  if (!copy) validationError.value = '请输入系统消息内容。'
-  else if (copy.length > 300) validationError.value = '系统消息内容不能超过 300 个字符。'
-  else if (unknownKey) validationError.value = `变量 {${unknownKey}} 不存在，请从右侧面板选择。`
-  else if (unavailableKey) validationError.value = `变量 {${unavailableKey}} 在「${String(props.row.node)}」节点无值，请移除。`
-  else validationError.value = ''
+  if (!copy) return `请输入${languageLabel}系统消息内容。`
+  if (copy.length > 300) return `${languageLabel}系统消息内容不能超过 300 个字符。`
+  if (unknownKey) return `${languageLabel}文案中的变量 {${unknownKey}} 不存在，请从右侧面板选择。`
+  if (unavailableKey) return `${languageLabel}文案中的变量 {${unavailableKey}} 在「${String(props.row.node)}」节点无值，请移除。`
+  return ''
+}
+
+function save() {
+  const copy = content.value.trim()
+  const copyEn = contentEn.value.trim()
+  validationError.value = validateCopy(copy, '中文') || validateCopy(copyEn, '英文')
   if (validationError.value) return
-  emit('save', { ...props.row, content: copy })
+  emit('save', { ...props.row, content: copy, contentEn: copyEn })
 }
 </script>
 
@@ -84,6 +98,7 @@ function save() {
   <ModalDialog :title="`编辑系统消息 · ${row.id}`" eyebrow="SYSTEM MESSAGE EDITOR" size="wide" @close="emit('close')">
     <section class="message-editor-note"><Info :size="17" /><div><strong>发送节点由系统预置</strong><p>发布端、节点分组、发送节点和触发时机不可修改；运营人员只维护该节点的消息文案，启停在列表操作栏完成。</p></div></section>
     <section v-if="isRiskNode" class="message-editor-risk"><TriangleAlert :size="17" /><div><strong>资金与合规通知提醒</strong><p>该节点涉及资金或合规告知，禁用后用户将不再收到对应通知。此提示不阻断编辑和保存。</p></div></section>
+    <ContentLanguageTabs v-model="contentLanguage" />
     <div class="message-editor-grid">
       <section class="message-editor-card">
         <header><span>节点信息</span><small>只读</small></header>
@@ -97,8 +112,8 @@ function save() {
         </section>
       </section>
       <section class="message-editor-card message-editor-card--content">
-        <header><span>消息内容 <em>*</em></span><small>{{ content.length }} / 300</small></header>
-        <textarea ref="contentInput" v-model="content" autofocus maxlength="300" placeholder="请输入该系统节点触发时发送的消息文案"></textarea>
+        <header><span>{{ contentLanguage === 'zh' ? '消息内容（中文）' : 'Message content (English)' }} <em>*</em></span><small>{{ activeContent.length }} / 300</small></header>
+        <textarea ref="contentInput" v-model="activeContent" autofocus maxlength="300" :placeholder="contentLanguage === 'zh' ? '请输入该系统节点触发时发送的消息文案' : 'Enter the English message sent at this system event'"></textarea>
         <div class="message-preview"><small>效果预览</small><p><template v-for="(part, index) in previewParts" :key="index"><mark v-if="part.unknown">{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></p><span>变量已使用示例数据渲染；红色内容表示未知变量。</span></div>
       </section>
     </div>

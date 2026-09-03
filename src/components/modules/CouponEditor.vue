@@ -2,6 +2,7 @@
 import { AlertTriangle, Check, Info } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
@@ -16,6 +17,8 @@ const emit = defineEmits<{
 }>()
 
 const name = ref('')
+const nameEn = ref('')
+const contentLanguage = ref<ContentLanguage>('zh')
 const couponType = ref<'满减' | '折扣'>('满减')
 const service = ref<'拼车' | '独享'>('拼车')
 const thresholdAmount = ref<number | null>(null)
@@ -34,6 +37,8 @@ const remainingQuantity = computed(() => Math.max(0, Number(totalQuantity.value 
 
 function initialize() {
   name.value = String(props.row?.name ?? '')
+  nameEn.value = String(props.row?.nameEn ?? '')
+  contentLanguage.value = 'zh'
   couponType.value = props.row?.couponType === '折扣' ? '折扣' : '满减'
   service.value = props.row?.service === '独享' ? '独享' : '拼车'
   thresholdAmount.value = props.row?.thresholdAmount == null ? null : Number(props.row.thresholdAmount)
@@ -64,6 +69,7 @@ const rulePreview = computed(() => {
 function validate() {
   const trimmedName = name.value.trim()
   if (!trimmedName) return '请输入券名。'
+  if (!nameEn.value.trim()) return '请输入英文券名。'
   if (props.rows.some((row) => row.id !== props.row?.id && String(row.name ?? '').trim().toLowerCase() === trimmedName.toLowerCase())) return '券名已存在，请使用其他名称。'
   if (!validFrom.value || !validTo.value) return '请选择完整的有效期范围。'
   if (validFrom.value > validTo.value) return '有效期开始日期不能晚于结束日期。'
@@ -98,6 +104,7 @@ function save() {
   emit('save', {
     id: props.row?.id ?? `CPN-${new Date().toISOString().slice(2, 10).replaceAll('-', '')}-${String(props.rows.length + 1).padStart(2, '0')}`,
     name: name.value.trim(),
+    nameEn: nameEn.value.trim(),
     couponType: couponType.value,
     thresholdAmount: threshold,
     discountAmount: discount,
@@ -125,8 +132,11 @@ function save() {
       <div><strong>该券已有 {{ issuedQuantity.toLocaleString('en-GB') }} 张发放记录</strong><p>类型、金额/折扣、使用服务、发放总量和有效期开始时间已锁定，仅可修改券名与有效期结束时间。</p></div>
     </section>
 
+    <ContentLanguageTabs v-model="contentLanguage" />
+    <div class="coupon-localized-field">
+      <label class="coupon-field"><span>{{ contentLanguage === 'zh' ? '券名（中文）' : 'Coupon name (English)' }} <em>*</em></span><input v-if="contentLanguage === 'zh'" v-model="name" class="field-control" type="text" maxlength="50" placeholder="请输入 App 展示的中文券名" /><input v-else v-model="nameEn" class="field-control" type="text" maxlength="80" placeholder="Enter the coupon name shown in the App" /></label>
+    </div>
     <div class="coupon-form-grid">
-      <label class="coupon-field coupon-field--wide"><span>券名 <em>*</em></span><input v-model="name" class="field-control" type="text" maxlength="50" placeholder="请输入便于识别的券名" /></label>
       <label class="coupon-field"><span>券类型 <em>*</em></span><select v-model="couponType" class="field-control" :disabled="coreFieldsLocked"><option value="满减">满减</option><option value="折扣">折扣</option></select></label>
       <label class="coupon-field"><span>使用服务 <em>*</em></span><select v-model="service" class="field-control" :disabled="coreFieldsLocked"><option value="拼车">拼车</option><option value="独享">独享</option></select></label>
 
@@ -160,6 +170,7 @@ function save() {
 .coupon-lock-notice strong { display: block; font-size: 10px; }
 .coupon-lock-notice p { margin: 3px 0 0; font-size: 9px; line-height: 1.55; }
 .coupon-form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.coupon-localized-field { padding: 12px; margin: 10px 0 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--page); }
 .coupon-field { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
 .coupon-field--wide { grid-column: span 2; }
 .coupon-field > span { color: var(--text-subtle); font-size: 9px; font-weight: 750; }

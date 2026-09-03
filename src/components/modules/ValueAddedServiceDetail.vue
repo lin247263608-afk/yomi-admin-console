@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { ListOrdered, Pencil, ShieldAlert } from '@lucide/vue'
+import { computed, ref } from 'vue'
 
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
-defineProps<{ row: ModuleRow }>()
+const props = defineProps<{ row: ModuleRow }>()
 const emit = defineEmits<{ close: []; edit: [] }>()
+const contentLanguage = ref<ContentLanguage>('zh')
+const localized = computed(() => contentLanguage.value === 'en'
+  ? { name: String(props.row.nameEn ?? '待配置 English 服务名称'), description: String(props.row.descriptionEn ?? '待配置 English 服务描述') }
+  : { name: String(props.row.name ?? '—'), description: String(props.row.description ?? '—') })
 
 function money(value: unknown) {
   const amount = Number(value)
@@ -20,18 +26,19 @@ function money(value: unknown) {
   <ModalDialog :title="`增值服务详情 · ${row.id}`" eyebrow="SERVICE DETAIL" size="wide" @close="emit('close')">
     <section class="service-detail-head">
       <span><ListOrdered :size="20" /></span>
-      <div><small>{{ row.serviceMode ?? '线下服务' }}</small><h3>{{ row.name }}</h3><p>{{ row.description }}</p></div>
+      <div><small>{{ row.serviceMode ?? '线下服务' }}</small><h3>{{ localized.name }}</h3><p>{{ localized.description }}</p></div>
       <StatusBadge :label="String(row.status ?? '—')" :tone="row.status === '启用' ? 'success' : 'danger'" dot />
     </section>
+    <ContentLanguageTabs v-model="contentLanguage" compact />
 
     <div class="service-detail-grid">
       <div><span>服务ID</span><strong class="mono">{{ row.id }}</strong></div>
       <div><span>费用</span><strong class="service-price">{{ money(row.fee) }}</strong></div>
       <div><span>排序</span><strong class="mono">{{ row.sort ?? '—' }}</strong></div>
       <div><span>状态</span><StatusBadge :label="String(row.status ?? '—')" :tone="row.status === '启用' ? 'success' : 'danger'" dot /></div>
-      <div class="service-detail-grid__wide"><span>服务名称</span><strong>{{ row.name }}</strong></div>
+      <div class="service-detail-grid__wide"><span>{{ contentLanguage === 'zh' ? '服务名称（中文）' : 'Service name (English)' }}</span><strong>{{ localized.name }}</strong></div>
       <div class="service-detail-grid__wide"><span>服务类型</span><strong>{{ row.serviceMode ?? '线下服务' }}</strong></div>
-      <div class="service-detail-grid__full"><span>服务描述</span><strong>{{ row.description }}</strong></div>
+      <div class="service-detail-grid__full"><span>{{ contentLanguage === 'zh' ? '服务描述（中文）' : 'Service description (English)' }}</span><strong>{{ localized.description }}</strong></div>
     </div>
 
     <section v-if="row.businessLinked" class="service-business-link"><ShieldAlert :size="17" /><div><strong>业务关联服务，不允许删除</strong><p>可继续编辑或禁用；历史订单中的服务名称、费用与分账明细保留不变。</p></div></section>

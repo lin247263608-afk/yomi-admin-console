@@ -2,6 +2,7 @@
 import { AlertTriangle, Check, ImagePlus, Info } from '@lucide/vue'
 import { reactive, ref, watch } from 'vue'
 
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
@@ -11,6 +12,10 @@ const emit = defineEmits<{ close: []; save: [row: ModuleRow] }>()
 const name = ref('')
 const description = ref('')
 const image = ref('')
+const nameEn = ref('')
+const descriptionEn = ref('')
+const imageEn = ref('')
+const contentLanguage = ref<ContentLanguage>('zh')
 const channels = reactive<string[]>([])
 const jumpType = ref<'无跳转' | '链接跳转'>('无跳转')
 const jumpUrl = ref('')
@@ -24,6 +29,10 @@ function initialize() {
   name.value = String(props.row?.name ?? '')
   description.value = String(props.row?.description ?? '')
   image.value = String(props.row?.image ?? '')
+  nameEn.value = String(props.row?.nameEn ?? '')
+  descriptionEn.value = String(props.row?.descriptionEn ?? '')
+  imageEn.value = String(props.row?.imageEn ?? '')
+  contentLanguage.value = 'zh'
   channels.splice(0, channels.length, ...channelOptions.filter((item) => String(props.row?.channel ?? '小程序 + APP').includes(item)))
   jumpType.value = props.row?.jumpType === '链接跳转' ? '链接跳转' : '无跳转'
   jumpUrl.value = String(props.row?.jumpUrl ?? '')
@@ -54,7 +63,8 @@ function handleImageUpload(event: Event) {
   }
   const reader = new FileReader()
   reader.onload = () => {
-    image.value = String(reader.result ?? '')
+    if (contentLanguage.value === 'en') imageEn.value = String(reader.result ?? '')
+    else image.value = String(reader.result ?? '')
     input.value = ''
   }
   reader.onerror = () => { validationError.value = '图片读取失败，请更换文件后重试。' }
@@ -64,12 +74,17 @@ function handleImageUpload(event: Event) {
 function save() {
   const trimmedName = name.value.trim()
   const trimmedDescription = description.value.trim()
+  const trimmedNameEn = nameEn.value.trim()
+  const trimmedDescriptionEn = descriptionEn.value.trim()
   const trimmedJumpUrl = jumpUrl.value.trim()
   const sortValue = Number(sort.value)
 
   if (!trimmedName) validationError.value = '请输入 Banner 名称。'
   else if (props.rows.some((item) => item.id !== props.row?.id && String(item.name ?? '').trim().toLowerCase() === trimmedName.toLowerCase())) validationError.value = 'Banner 名称已存在，请使用其他名称。'
   else if (!image.value) validationError.value = '请上传 Banner 图片。'
+  else if (!trimmedNameEn) validationError.value = '请输入英文 Banner 名称。'
+  else if (!trimmedDescriptionEn) validationError.value = '请输入英文 Banner 描述。'
+  else if (!imageEn.value) validationError.value = '请上传英文 Banner 图片。'
   else if (!channels.length) validationError.value = '请至少选择一个发布端。'
   else if (jumpType.value === '链接跳转' && !trimmedJumpUrl) validationError.value = '选择链接跳转时，必须填写跳转地址。'
   else if (!validFrom.value || !validTo.value) validationError.value = '请选择完整的生效时间范围。'
@@ -83,6 +98,9 @@ function save() {
     name: trimmedName,
     description: trimmedDescription || '—',
     image: image.value,
+    nameEn: trimmedNameEn,
+    descriptionEn: trimmedDescriptionEn,
+    imageEn: imageEn.value,
     channel: channelOptions.filter((item) => channels.includes(item)).join(' + '),
     jumpType: jumpType.value,
     jumpUrl: jumpType.value === '链接跳转' ? trimmedJumpUrl : '',
@@ -98,18 +116,19 @@ function save() {
 <template>
   <ModalDialog :title="row ? `编辑 Banner · ${row.id}` : '新增 Banner'" eyebrow="BANNER EDITOR" size="wide" @close="emit('close')">
     <section class="banner-editor-note"><Info :size="17" /><div><strong>新增 Banner 默认禁用</strong><p>保存并检查图片、发布端与生效时间后，可在列表中启用。未到生效日期时将显示“待生效”。</p></div></section>
+    <ContentLanguageTabs v-model="contentLanguage" />
 
     <div class="banner-editor-layout">
       <label class="banner-uploader">
-        <img v-if="image" :src="image" alt="Banner 图片预览" />
-        <span v-else><ImagePlus :size="28" /><b>上传 Banner 图片</b><small>支持 JPG、PNG、WebP，最大 5 MB</small></span>
-        <i><ImagePlus :size="14" />{{ image ? '更换图片' : '选择图片' }}</i>
+        <img v-if="contentLanguage === 'zh' ? image : imageEn" :src="contentLanguage === 'zh' ? image : imageEn" :alt="`${contentLanguage === 'zh' ? '中文' : 'English'} Banner 图片预览`" />
+        <span v-else><ImagePlus :size="28" /><b>上传 {{ contentLanguage === 'zh' ? '中文' : 'English' }} Banner 图片</b><small>支持 JPG、PNG、WebP，最大 5 MB</small></span>
+        <i><ImagePlus :size="14" />{{ (contentLanguage === 'zh' ? image : imageEn) ? '更换图片' : '选择图片' }}</i>
         <input type="file" accept="image/jpeg,image/png,image/webp" @change="handleImageUpload" />
       </label>
 
       <div class="banner-form-grid">
-        <label class="banner-field banner-field--wide"><span>Banner 名称 <em>*</em></span><input v-model="name" class="field-control" type="text" maxlength="50" placeholder="请输入 Banner 名称" /></label>
-        <label class="banner-field banner-field--wide"><span>描述</span><textarea v-model="description" class="form-textarea" maxlength="160" placeholder="请输入展示文案或运营说明"></textarea></label>
+        <label class="banner-field banner-field--wide"><span>{{ contentLanguage === 'zh' ? 'Banner 名称（中文）' : 'Banner name (English)' }} <em>*</em></span><input v-if="contentLanguage === 'zh'" v-model="name" class="field-control" type="text" maxlength="50" placeholder="请输入 Banner 名称" /><input v-else v-model="nameEn" class="field-control" type="text" maxlength="80" placeholder="Enter the Banner name" /></label>
+        <label class="banner-field banner-field--wide"><span>{{ contentLanguage === 'zh' ? '描述（中文）' : 'Description (English)' }} <em>*</em></span><textarea v-if="contentLanguage === 'zh'" v-model="description" class="form-textarea" maxlength="160" placeholder="请输入展示文案或运营说明"></textarea><textarea v-else v-model="descriptionEn" class="form-textarea" maxlength="240" placeholder="Enter the App-facing Banner copy"></textarea></label>
         <div class="banner-field banner-field--wide"><span>发布端 <em>*</em></span><div class="channel-options"><button v-for="channel in channelOptions" :key="channel" type="button" :class="{ 'is-selected': channels.includes(channel) }" @click="toggleChannel(channel)">{{ channel }}</button></div><small>支持同时发布到小程序和 APP</small></div>
         <label class="banner-field"><span>跳转类型 <em>*</em></span><select v-model="jumpType" class="field-control"><option value="无跳转">无跳转</option><option value="链接跳转">链接跳转</option></select></label>
         <label class="banner-field"><span>排序 <em>*</em></span><input v-model="sort" class="field-control" type="number" min="0" step="1" placeholder="排序值" /></label>

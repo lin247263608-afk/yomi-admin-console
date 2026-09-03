@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { BellRing, Pencil } from '@lucide/vue'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 import { contextLabels, nodeContexts } from '@/data/messageVariables'
@@ -9,14 +10,17 @@ import { contextLabels, nodeContexts } from '@/data/messageVariables'
 const props = defineProps<{ row: ModuleRow }>()
 const emit = defineEmits<{ close: []; edit: [] }>()
 const boundContexts = computed(() => (nodeContexts[String(props.row.node ?? '')] ?? []).map((context) => contextLabels[context]))
-const contentParts = computed(() => String(props.row.content ?? '').split(/(\{[A-Za-z][A-Za-z0-9]*\})/g).filter(Boolean).map((text) => ({ text, variable: /^\{[A-Za-z][A-Za-z0-9]*\}$/.test(text) })))
+const contentLanguage = ref<ContentLanguage>('zh')
+const localizedContent = computed(() => contentLanguage.value === 'en' ? String(props.row.contentEn ?? '待配置 English 系统消息') : String(props.row.content ?? '—'))
+const contentParts = computed(() => localizedContent.value.split(/(\{[A-Za-z][A-Za-z0-9]*\})/g).filter(Boolean).map((text) => ({ text, variable: /^\{[A-Za-z][A-Za-z0-9]*\}$/.test(text) })))
 </script>
 
 <template>
   <ModalDialog :title="`系统消息详情 · ${row.id}`" eyebrow="SYSTEM MESSAGE DETAIL" size="wide" @close="emit('close')">
     <section class="message-detail-hero"><span><BellRing :size="20" /></span><div><small>{{ row.endpoint }} / {{ row.group }}</small><h3>{{ row.node }}</h3><p>{{ row.triggerAt }}</p></div><StatusBadge :label="String(row.status)" :tone="row.status === '启用' ? 'success' : 'danger'" dot /></section>
+    <ContentLanguageTabs v-model="contentLanguage" compact />
     <div class="message-detail-grid"><div><span>消息 ID</span><strong class="mono">{{ row.id }}</strong></div><div><span>发布端</span><strong>{{ row.endpoint }}</strong></div><div><span>节点分组</span><strong>{{ row.group }}</strong></div><div><span>发送节点</span><strong>{{ row.node }}</strong></div><div class="message-detail-grid__wide"><span>触发时机</span><strong>{{ row.triggerAt }}</strong></div><div class="message-detail-grid__wide"><span>绑定上下文</span><strong>{{ boundContexts.join('、') || '无' }}</strong></div></div>
-    <section class="message-detail-content"><header><span>消息模板内容</span><small>变量以高亮标签展示</small></header><div><BellRing :size="15" /><p><template v-for="(part, index) in contentParts" :key="index"><code v-if="part.variable">{{ part.text }}</code><template v-else>{{ part.text }}</template></template></p></div></section>
+    <section class="message-detail-content"><header><span>{{ contentLanguage === 'zh' ? '消息模板内容（中文）' : 'Message template (English)' }}</span><small>变量以高亮标签展示</small></header><div><BellRing :size="15" /><p><template v-for="(part, index) in contentParts" :key="index"><code v-if="part.variable">{{ part.text }}</code><template v-else>{{ part.text }}</template></template></p></div></section>
     <section class="message-detail-rule"><strong>节点约束</strong><p>该节点由系统预置，不能新增或改名。禁用后仅停止后续触发，不影响已发送消息与历史记录。</p></section>
     <template #footer><button class="btn btn--secondary" type="button" @click="emit('close')">关闭</button><button class="btn btn--brand" type="button" @click="emit('edit')"><Pencil :size="14" />编辑文案</button></template>
   </ModalDialog>

@@ -11,6 +11,7 @@ type SystemMessageSeed = {
   node: string
   triggerAt: string
   content: string
+  contentEn?: string
   variables?: string
   disabled?: boolean
 }
@@ -67,6 +68,55 @@ const driverSystemMessageSeeds: SystemMessageSeed[] = [
   { endpoint: '司导端', group: '运营', node: '意见反馈已处理', triggerAt: '意见反馈工单处理完成后', content: '您提交的意见反馈已处理，请查看处理结果。' },
 ]
 
+const systemMessageEnglishByNode: Record<string, string> = {
+  '注册成功': 'Welcome to YOMI. Your account has been registered successfully.',
+  '司机审核通过': 'Your driver verification has been approved. You can now accept orders.',
+  '司机审核驳回': 'Your driver verification was not approved. Please update your details and submit them again.',
+  '定金支付成功': 'The deposit of {depositAmount} for order {orderNo} was paid successfully. We are matching your carpool.',
+  '全款支付成功': 'Payment of {orderAmount} for order {orderNo} was successful.',
+  '支付超时取消': 'Order {orderNo} was cancelled because payment was not completed in time.',
+  '拼团成功': 'Order {orderNo} has been successfully grouped. Please watch for further trip updates.',
+  '截团前提醒': 'Your carpool group closes at {deadlineAt}. Please watch for the final result.',
+  '拼团失败': 'Unfortunately, order {orderNo} did not form a group. Your deposit will be refunded to the original payment method.',
+  '拼团已取消': 'The carpool group for order {orderNo} has been cancelled. Please check the refund progress.',
+  '成员变动': 'Your carpool group has changed and now has {memberCount} passengers.',
+  '尾款待付': 'The balance of {balanceAmount} for order {orderNo} is due. Please pay before departure.',
+  '尾款补款提醒': 'An additional payment of {balanceAmount} is required for order {orderNo}. Please pay promptly.',
+  '尾款差额退还': 'A balance adjustment refund of {balanceAmount} for order {orderNo} has been initiated.',
+  '司机已接单': 'A driver has accepted order {orderNo}. View the driver details on the order page.',
+  '司机已改派': 'The driver for order {orderNo} has changed. Please review the latest driver details.',
+  '司机已出发': 'Your driver is on the way to the pickup point. Please keep your phone available.',
+  '司机已到达': 'Your driver has arrived at the agreed pickup point. Please meet the driver promptly.',
+  '行程已开始': 'Trip {orderNo} has started. We hope you enjoy your journey.',
+  '行程已结束': 'Order {orderNo} is complete. Thank you for travelling with YOMI.',
+  '退款已受理': 'The refund of {refundAmount} for order {orderNo} has been accepted.',
+  '退款已到账': 'The refund of {refundAmount} for order {orderNo} has been completed.',
+  '优惠券到账': 'You received a {couponName} coupon, valid until {expireAt}.',
+  '优惠券即将过期': 'Your {couponName} coupon expires soon. Please use it before {expireAt}.',
+  '资料审核通过': 'Your verification documents have been approved.',
+  '资料审核驳回': 'Your verification documents were not approved. Please follow the review notes and submit them again.',
+  'Stripe 入驻提醒': 'Please complete Stripe Express onboarding so that you can receive settlements.',
+  'Stripe 认证通过': 'Your Stripe account has been verified.',
+  'Stripe 认证受限': 'Your Stripe account is currently restricted. Please provide the requested information.',
+  '信息修改审核结果': 'The review of your updated information is complete. Please view the result.',
+  '收到订单指派': 'You have a new assignment for order {orderNo}. Please confirm within 60 seconds.',
+  '指派已失效': 'The assignment for order {orderNo} has expired.',
+  '抢单成功': 'You successfully accepted order {orderNo}.',
+  '订单被改派': 'Order {orderNo} has been reassigned by the platform.',
+  '订单已取消': 'Order {orderNo} has been cancelled. Please view the order details.',
+  '订单信息变更': 'Order {orderNo} has been updated. Please review and confirm the latest information.',
+  '行程即将开始': 'Order {orderNo} starts soon. Please prepare for departure.',
+  '乘客尾款未付': 'Passengers on order {orderNo} still have an unpaid balance. Please wait for platform support.',
+  '结算已到账': 'The settlement of {settleAmount} for order {orderNo} has arrived.',
+  '结算异常': 'The settlement of {settleAmount} for order {orderNo} has not completed. Our finance team is reviewing it.',
+  '证件即将到期': 'Your {documentName} expires on {expireAt}. Please update it promptly.',
+  '证件已过期': 'Your {documentName} has expired. Related order permissions will be restricted.',
+  '接单权限变更': 'Your order acceptance permission is now: {permissionStatus}.',
+  '订单池权限变更': 'Your order pool permission is now: {permissionStatus}.',
+  '平台公告': 'A new platform notice is available. Please view it in the notice centre.',
+  '意见反馈已处理': 'Your feedback has been processed. Please view the result.',
+}
+
 function buildSystemMessageRows(): ModuleRow[] {
   return [...passengerSystemMessageSeeds, ...driverSystemMessageSeeds].map((item, index) => ({
     id: `SM-${item.endpoint === '乘客端' ? 'P' : 'D'}-${String(item.endpoint === '乘客端' ? index + 1 : index - passengerSystemMessageSeeds.length + 1).padStart(3, '0')}`,
@@ -75,6 +125,7 @@ function buildSystemMessageRows(): ModuleRow[] {
     node: item.node,
     triggerAt: item.triggerAt,
     content: item.content,
+    contentEn: item.contentEn ?? systemMessageEnglishByNode[item.node] ?? '',
     variables: item.variables ?? '无',
     status: item.disabled ? '禁用' : '启用',
   }))
@@ -772,3 +823,35 @@ export const opsModuleCatalog: Record<string, ModuleCatalogEntry> = {
     canEdit: false,
   },
 }
+
+const opsLocalizedContent: Record<string, Record<string, string>> = {
+  'CPN-260801': { nameEn: 'New Customer Airport Transfer £8 Off' },
+  'CPN-260805': { nameEn: 'Summer Carpool 10% Off' },
+  'CPN-260612': { nameEn: 'Late-night Airport Transfer Credit' },
+  'CPN-260701': { nameEn: 'Welcome Back Reward' },
+  'VAS-001': { nameEn: 'Airport Name Board', descriptionEn: 'Meet-and-greet in the arrivals hall with a personalised name board.' },
+  'VAS-002': { nameEn: 'Child Seat', descriptionEn: 'A child safety seat compliant with UK standards.' },
+  'VAS-003': { nameEn: 'Chauffeur Formalwear', descriptionEn: 'The driver provides the service in formal chauffeur attire.' },
+  'BN-260801': { nameEn: 'Heathrow Airport Transfer Season', descriptionEn: 'Summer airport transfer offer', imageEn: bannerImage('Heathrow Transfers', 'Land in London and travel with ease', '#0b2440', '#285a78') },
+  'BN-260812': { nameEn: 'New Carpool Route', descriptionEn: 'London to Cambridge carpool', imageEn: bannerImage('New Carpool Route', 'London to Cambridge is now open', '#17324d', '#377c6b') },
+  'BN-260901': { nameEn: 'Freshers Travel Reward', descriptionEn: 'Exclusive offer for new students', imageEn: bannerImage('Freshers Travel Reward', 'Exclusive student offer coming soon', '#40204f', '#9f4d6d') },
+  'BN-260601': { nameEn: 'Spring Brand Story', descriptionEn: 'Seasonal brand campaign', imageEn: bannerImage('Spring in Britain', 'Discover more with YOMI', '#1f513f', '#83a957') },
+  'NT-260818': { titleEn: 'Heathrow Pickup Point Update', subtitleEn: 'Temporary relocation of the T3 pickup area', contentEn: 'Due to temporary traffic arrangements, the Terminal 3 pickup point has moved to Car Park 3. Please follow the directions on your order page.' },
+  'NT-260816': { titleEn: 'Weekend Road Closure Notice', subtitleEn: 'Temporary closures in Central London', contentEn: 'Some Central London roads will be temporarily restricted this weekend. Drivers should plan an alternative route and check live traffic before departure.' },
+  'NT-260901': { titleEn: 'Scheduled System Maintenance', subtitleEn: 'Short maintenance window on 2 September', contentEn: 'The system will undergo maintenance from 02:00 to 02:30 on 2 September. Some pages may be briefly unavailable; active trips will not be affected.' },
+  'NT-260701': { titleEn: 'Summer Service Notice', subtitleEn: 'Please allow extra waiting time at peak hours', contentEn: 'Airport traffic increases during summer. Peak-hour waiting times may be around 15 minutes longer. Please have your luggage ready and keep your phone available.' },
+  'CC-001': { contentEn: 'Hello everyone, I am pleased to be travelling with you.' },
+  'CC-002': { contentEn: 'Hello, I will arrive at the meeting point on time.' },
+  'CC-006': { contentEn: 'I have arrived at the agreed pickup point.' },
+  'CC-007': { contentEn: 'I am on my way to the pickup point. Please wait a moment.' },
+  'CC-012': { contentEn: 'Could we stop at the next safe location, please?' },
+  'CC-013': { contentEn: 'Could you adjust the temperature in the vehicle, please?' },
+  'CC-018': { contentEn: 'Hello, I have set off for the pickup point.' },
+  'CC-019': { contentEn: 'I have arrived. Please wait at the agreed pickup point.' },
+  'CC-024': { contentEn: 'Traffic is heavy ahead. I expect to arrive 10 minutes late.' },
+  'CC-025': { contentEn: 'We will make a short stop at the next safe location.' },
+}
+
+Object.values(opsModuleCatalog).forEach((module) => {
+  module.rows?.forEach((row) => Object.assign(row, opsLocalizedContent[row.id] ?? {}))
+})

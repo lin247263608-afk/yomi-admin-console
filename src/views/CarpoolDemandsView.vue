@@ -3,6 +3,7 @@ import { Filter, Search, SlidersHorizontal, Users, X } from '@lucide/vue'
 import { computed, reactive, ref, watch } from 'vue'
 
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import PassengerAddOnSummary from '@/components/orders/PassengerAddOnSummary.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import DrawerShell from '@/components/overlay/DrawerShell.vue'
@@ -51,6 +52,8 @@ const cancelTarget = ref<CarpoolDemand | null>(null)
 const cancelReason = ref('')
 const shareConfigOpen = ref(false)
 const sharePrefixDraft = ref(appStore.shareLinkPrefix)
+const sharePrefixDraftEn = ref(appStore.shareLinkPrefixEn)
+const shareLanguage = ref<ContentLanguage>('zh')
 
 function londonDateKey(iso: string) {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -245,13 +248,16 @@ function applyStatusFilter(status: '全部' | CarpoolStatus) {
 
 function openShareConfig() {
   sharePrefixDraft.value = appStore.shareLinkPrefix
+  sharePrefixDraftEn.value = appStore.shareLinkPrefixEn
+  shareLanguage.value = 'zh'
   shareConfigOpen.value = true
 }
 
 function saveShareConfig() {
   const value = sharePrefixDraft.value.trim()
-  if (!value) return
-  appStore.updateShareLinkPrefix(value)
+  const valueEn = sharePrefixDraftEn.value.trim()
+  if (!value || !valueEn) return
+  appStore.updateShareLinkPrefix(value, valueEn)
   shareConfigOpen.value = false
   appStore.notify('分享前缀已更新', '司机分享订单池与乘客分享拼车团已同步使用新文案。', 'success')
 }
@@ -433,10 +439,17 @@ function saveShareConfig() {
 
     <ModalDialog v-if="shareConfigOpen" title="分享链接前缀" eyebrow="SHARED COPY" @close="shareConfigOpen = false">
       <p class="config-description">这份文案由司机分享订单池与乘客分享拼车团共同使用，保存后两处同步生效。</p>
-      <label class="form-label" for="share-prefix">分享前缀文案</label>
-      <textarea id="share-prefix" v-model="sharePrefixDraft" class="form-textarea" maxlength="80" placeholder="请输入分享链接前缀"></textarea>
-      <div class="share-preview"><span>预览</span><p>{{ sharePrefixDraft || '请输入分享链接前缀' }} · https://yomi.travel/s/••••</p></div>
-      <template #footer><button class="btn btn--secondary" type="button" @click="shareConfigOpen = false">取消</button><button class="btn btn--brand" type="button" :disabled="!sharePrefixDraft.trim()" @click="saveShareConfig">保存并同步</button></template>
+      <ContentLanguageTabs v-model="shareLanguage" />
+      <template v-if="shareLanguage === 'zh'">
+        <label class="form-label" for="share-prefix">分享前缀文案（中文）</label>
+        <textarea id="share-prefix" v-model="sharePrefixDraft" class="form-textarea" maxlength="80" placeholder="请输入中文分享链接前缀"></textarea>
+      </template>
+      <template v-else>
+        <label class="form-label" for="share-prefix-en">Share prefix (English)</label>
+        <textarea id="share-prefix-en" v-model="sharePrefixDraftEn" class="form-textarea" maxlength="120" placeholder="Enter the English share prefix"></textarea>
+      </template>
+      <div class="share-preview"><span>{{ shareLanguage === 'zh' ? '中文预览' : 'English preview' }}</span><p>{{ (shareLanguage === 'zh' ? sharePrefixDraft : sharePrefixDraftEn) || (shareLanguage === 'zh' ? '请输入分享链接前缀' : 'Enter the English share prefix') }} · https://yomi.travel/s/••••</p></div>
+      <template #footer><button class="btn btn--secondary" type="button" @click="shareConfigOpen = false">取消</button><button class="btn btn--brand" type="button" :disabled="!sharePrefixDraft.trim() || !sharePrefixDraftEn.trim()" @click="saveShareConfig">保存中英文并同步</button></template>
     </ModalDialog>
   </div>
 </template>

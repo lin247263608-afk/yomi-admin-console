@@ -2,6 +2,7 @@
 import { Plus, Trash2 } from '@lucide/vue'
 import { computed, reactive, ref } from 'vue'
 
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import { businessConfig } from '@/data/businessConfig'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
@@ -36,6 +37,7 @@ const source: ModuleRow = props.row ? { ...props.row } : { id: '' }
 const draft = reactive({
   id: String(source.id ?? ''),
   name: String(source.name ?? ''),
+  nameEn: String(source.nameEn ?? ''),
   business: String(source.business ?? '接机'),
   startFenceId: String(source.startFenceId ?? activeFences.value[0]?.id ?? ''),
   endFenceId: String(source.endFenceId ?? activeFences.value.find((item) => item.id !== activeFences.value[0]?.id)?.id ?? ''),
@@ -48,6 +50,7 @@ const draft = reactive({
 const vehiclePricing = reactive<VehiclePriceDraft[]>(readVehiclePricing(source))
 const specialPeriods = reactive<SpecialPeriod[]>(readSpecialPeriods(source))
 const errorMessage = ref('')
+const contentLanguage = ref<ContentLanguage>('zh')
 const lowestFullGroupSeatPrice = computed(() => {
   const prices = vehiclePricing
     .map((item) => Number(item.baseFare))
@@ -114,7 +117,8 @@ function overlaps(a: SpecialPeriod, b: SpecialPeriod) {
 
 function save() {
   errorMessage.value = ''
-  if (!draft.name.trim()) return void (errorMessage.value = '请填写路线名称。')
+  if (!draft.name.trim()) return void (errorMessage.value = '请填写中文路线名称。')
+  if (!draft.nameEn.trim()) return void (errorMessage.value = '请填写英文路线名称。')
   if (!draft.startFenceId || !draft.endFenceId) return void (errorMessage.value = '起点和终点围栏均需选择。')
   if (draft.startFenceId === draft.endFenceId) return void (errorMessage.value = '起点围栏与终点围栏不可选择同一个围栏。')
   if (!activeFences.value.some((item) => item.id === draft.startFenceId) || !activeFences.value.some((item) => item.id === draft.endFenceId)) {
@@ -161,6 +165,7 @@ function save() {
     ...source,
     id: draft.id || `RT-${Date.now().toString().slice(-6)}`,
     name: draft.name.trim(),
+    nameEn: draft.nameEn.trim(),
     business: draft.business,
     startFenceId: draft.startFenceId,
     endFenceId: draft.endFenceId,
@@ -190,8 +195,15 @@ function save() {
   <ModalDialog :title="row ? `编辑接送机路线 · ${row.id}` : '新增接送机路线'" eyebrow="ROUTE PRICING" size="wide" @close="emit('close')">
     <div v-if="errorMessage" class="route-editor-message route-editor-message--error">{{ errorMessage }}</div>
     <div v-if="depositWarning" class="route-editor-message route-editor-message--warning">{{ depositWarning }}</div>
+    <ContentLanguageTabs v-model="contentLanguage" />
+    <section class="route-localized-copy">
+      <label>
+        <span>{{ contentLanguage === 'zh' ? '路线名称（中文）' : 'Route name (English)' }}</span>
+        <input v-if="contentLanguage === 'zh'" v-model="draft.name" class="field-control" type="text" placeholder="请输入对外展示的中文路线名称" />
+        <input v-else v-model="draft.nameEn" class="field-control" type="text" placeholder="Enter the route name shown in the App" />
+      </label>
+    </section>
     <div class="route-editor-grid">
-      <label class="route-editor-field--wide"><span>路线名称</span><input v-model="draft.name" class="field-control" type="text" placeholder="请输入对外展示的路线名称" /></label>
       <label class="route-editor-field--wide"><span>业务</span><select v-model="draft.business" class="field-control"><option>接机</option><option>送机</option></select></label>
       <label class="route-editor-field--wide"><span>起点围栏（仅启用）</span><select v-model="draft.startFenceId" class="field-control"><option v-for="item in activeFences" :key="item.id" :value="item.id">{{ item.name }} · {{ item.id }} · {{ item.type }}</option></select></label>
       <label class="route-editor-field--wide"><span>终点围栏（仅启用）</span><select v-model="draft.endFenceId" class="field-control"><option v-for="item in activeFences" :key="item.id" :value="item.id">{{ item.name }} · {{ item.id }} · {{ item.type }}</option></select></label>
@@ -233,6 +245,9 @@ function save() {
 .route-editor-message { padding: 10px 12px; margin-bottom: 12px; border-radius: var(--radius-md); font-size: 10px; line-height: 1.5; }
 .route-editor-message--error { border: 1px solid var(--danger-border); background: var(--danger-bg); color: var(--danger); }
 .route-editor-message--warning { border: 1px solid var(--warning-border); background: var(--warning-bg); color: var(--warning); }
+.route-localized-copy { padding: 12px; margin: 10px 0 12px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--page); }
+.route-localized-copy label { display: flex; flex-direction: column; gap: 5px; }
+.route-localized-copy span { color: var(--text-subtle); font-size: 10px; font-weight: 700; }
 .route-editor-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .route-editor-field--wide { grid-column: span 2; }
 .route-editor-grid label, .route-pricing-row { display: flex; min-width: 0; flex-direction: column; gap: 5px; }

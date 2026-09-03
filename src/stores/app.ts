@@ -14,6 +14,7 @@ export const useAppStore = defineStore('app', {
     sidebarCollapsed: false,
     mobileMenuOpen: false,
     shareLinkPrefix: '一起拼车去机场，行程更划算',
+    shareLinkPrefixEn: 'Share this airport ride and travel for less',
     toasts: [] as ToastItem[],
     toastId: 0,
   }),
@@ -27,8 +28,9 @@ export const useAppStore = defineStore('app', {
     closeMobileMenu() {
       this.mobileMenuOpen = false
     },
-    updateShareLinkPrefix(value: string) {
+    updateShareLinkPrefix(value: string, valueEn: string) {
       this.shareLinkPrefix = value
+      this.shareLinkPrefixEn = valueEn
     },
     notify(
       title: string,

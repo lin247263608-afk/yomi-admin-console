@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import { Pencil } from '@lucide/vue'
+import { computed, ref } from 'vue'
 
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import ModalDialog from '@/components/overlay/ModalDialog.vue'
 import type { ModuleRow } from '@/data/moduleCatalog.types'
 
-defineProps<{ row: ModuleRow }>()
+const props = defineProps<{ row: ModuleRow }>()
 
 const emit = defineEmits<{
   close: []
   edit: []
 }>()
+const contentLanguage = ref<ContentLanguage>('zh')
+const localized = computed(() => {
+  const suffix = contentLanguage.value === 'en' ? 'En' : ''
+  return {
+    name: String(props.row[`name${suffix}`] ?? (contentLanguage.value === 'en' ? '待配置 English 路线名称' : '—')),
+    intro: String(props.row[`intro${suffix}`] ?? (contentLanguage.value === 'en' ? '待配置 English 路线介绍' : '—')),
+    description: String(props.row[`description${suffix}`] ?? (contentLanguage.value === 'en' ? '待配置 English 路线描述' : '—')),
+  }
+})
 
 function money(value: unknown) {
   const amount = Number(value)
@@ -23,18 +34,19 @@ function money(value: unknown) {
 <template>
   <ModalDialog :title="`包车路线详情 · ${row.id}`" eyebrow="CHARTER ROUTE" size="wide" @close="emit('close')">
     <section class="charter-detail-head">
-      <div><small>ROUTE OVERVIEW</small><h3>{{ row.name }}</h3><p>{{ row.intro }}</p></div>
+      <div><small>ROUTE OVERVIEW</small><h3>{{ localized.name }}</h3><p>{{ localized.intro }}</p></div>
       <StatusBadge :label="String(row.status ?? '—')" :tone="row.status === '启用' ? 'success' : 'danger'" dot />
     </section>
+    <ContentLanguageTabs v-model="contentLanguage" compact />
 
     <section class="charter-detail-section">
       <header><div><strong>路线信息</strong><small>字段与新增、编辑包车路线保持一致。</small></div></header>
       <div class="charter-detail-grid">
         <div><span>路线ID</span><strong class="mono">{{ row.id }}</strong></div>
         <div><span>排序</span><strong class="mono">{{ row.sort ?? '—' }}</strong></div>
-        <div class="charter-detail-grid__wide"><span>路线名称</span><strong>{{ row.name }}</strong></div>
-        <div class="charter-detail-grid__wide"><span>路线介绍</span><strong>{{ row.intro }}</strong></div>
-        <div class="charter-detail-grid__full"><span>路线描述</span><strong>{{ row.description }}</strong></div>
+        <div class="charter-detail-grid__wide"><span>{{ contentLanguage === 'zh' ? '路线名称（中文）' : 'Route name (English)' }}</span><strong>{{ localized.name }}</strong></div>
+        <div class="charter-detail-grid__wide"><span>{{ contentLanguage === 'zh' ? '路线介绍（中文）' : 'Route introduction (English)' }}</span><strong>{{ localized.intro }}</strong></div>
+        <div class="charter-detail-grid__full"><span>{{ contentLanguage === 'zh' ? '路线描述（中文）' : 'Route description (English)' }}</span><strong>{{ localized.description }}</strong></div>
         <div><span>参考金额</span><strong class="charter-detail-price">{{ money(row.referenceAmount) }}</strong><small>仅供乘客参考，实际价格以咨询为准</small></div>
         <div><span>联系电话</span><strong>{{ row.phone }}</strong></div>
         <div><span>状态</span><StatusBadge :label="String(row.status ?? '—')" :tone="row.status === '启用' ? 'success' : 'danger'" dot /></div>

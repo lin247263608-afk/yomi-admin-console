@@ -21,6 +21,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import StatusBadge from '@/components/feedback/StatusBadge.vue'
+import ContentLanguageTabs, { type ContentLanguage } from '@/components/forms/ContentLanguageTabs.vue'
 import DriverDetailDrawer from '@/components/drivers/DriverDetailDrawer.vue'
 import BannerDetail from '@/components/modules/BannerDetail.vue'
 import BannerEditor from '@/components/modules/BannerEditor.vue'
@@ -426,6 +427,8 @@ const driverDetailInitialTab = ref<'profile' | 'reviews'>('profile')
 const editTarget = ref<ModuleRow | null>(null)
 const editMode = ref<'create' | 'edit' | null>(null)
 const editDraft = reactive<Record<string, string>>({})
+const genericContentLanguage = ref<ContentLanguage>('zh')
+const detailContentLanguage = ref<ContentLanguage>('zh')
 const deleteTarget = ref<ModuleRow | null>(null)
 const vehicleRoutesTarget = ref<ModuleRow | null>(null)
 const geofenceRoutesTarget = ref<ModuleRow | null>(null)
@@ -481,6 +484,7 @@ function closeEditor() {
   editMode.value = null
   editTarget.value = null
   clearRecord(editDraft)
+  genericContentLanguage.value = 'zh'
 }
 
 function resetUserSearchState() {
@@ -1206,6 +1210,7 @@ function applyMetricFilter(metric: ModuleMetric) {
 
 function openRowDetail(row: ModuleRow, initialTab: 'profile' | 'reviews' = 'profile') {
   driverDetailInitialTab.value = initialTab
+  detailContentLanguage.value = 'zh'
   selectedRow.value = row
 }
 
@@ -1611,6 +1616,57 @@ function isDraftFieldRequired(column: ModuleColumn) {
   return section.value === 'charter-routes' && ['name', 'intro', 'description', 'referenceAmount', 'phone', 'sort'].includes(column.key)
 }
 
+function genericLocalizedKeys() {
+  if (section.value === 'vehicle-types') return ['name', 'description']
+  if (section.value === 'charter-routes') return ['name', 'intro', 'description']
+  return []
+}
+
+function isGenericLocalizedColumn(column: ModuleColumn) {
+  return genericLocalizedKeys().includes(column.key)
+}
+
+function genericLocalizedDraftKey(column: ModuleColumn) {
+  return genericContentLanguage.value === 'en' && isGenericLocalizedColumn(column)
+    ? `${column.key}En`
+    : column.key
+}
+
+function genericEditorLabel(column: ModuleColumn) {
+  if (genericContentLanguage.value !== 'en' || !isGenericLocalizedColumn(column)) return column.label
+  if (section.value === 'vehicle-types') {
+    return column.key === 'name' ? 'Vehicle name (English)' : 'Vehicle description (English)'
+  }
+  const labels: Record<string, string> = {
+    name: 'Route name (English)',
+    intro: 'Route introduction (English)',
+    description: 'Route description (English)',
+  }
+  return labels[column.key] ?? column.label
+}
+
+function genericEditorPlaceholder(column: ModuleColumn) {
+  if (genericContentLanguage.value !== 'en' || !isGenericLocalizedColumn(column)) return `请输入${column.label}`
+  if (section.value === 'vehicle-types') {
+    return column.key === 'name'
+      ? 'Enter the vehicle name shown in the App'
+      : 'Describe positioning, use cases and passenger experience'
+  }
+  const placeholders: Record<string, string> = {
+    name: 'Enter the route name shown in the App',
+    intro: 'Enter the short route introduction',
+    description: 'Enter the full route description',
+  }
+  return placeholders[column.key] ?? `Enter ${column.label}`
+}
+
+function localizedDetailValue(row: ModuleRow, column: ModuleColumn) {
+  if (detailContentLanguage.value === 'en' && isGenericLocalizedColumn(column)) {
+    return String(row[`${column.key}En`] ?? `待配置 English ${column.label}`)
+  }
+  return formatCell(row[column.key], column)
+}
+
 function handleVehicleImageUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -1639,6 +1695,8 @@ function openCreate() {
   draftColumns.value.forEach((column) => {
     editDraft[column.key] = optionsForColumn(column)[0] ?? ''
   })
+  genericLocalizedKeys().forEach((key) => { editDraft[`${key}En`] = '' })
+  genericContentLanguage.value = 'zh'
   if (section.value === 'geofences') {
     editDraft.vertexCount = '3'
     editDraft.geometryRelation = '正常'
@@ -1656,6 +1714,8 @@ function openEdit(row: ModuleRow) {
   draftColumns.value.forEach((column) => {
     editDraft[column.key] = String(row[column.key] ?? '')
   })
+  genericLocalizedKeys().forEach((key) => { editDraft[`${key}En`] = String(row[`${key}En`] ?? '') })
+  genericContentLanguage.value = 'zh'
   editTarget.value = row
   editMode.value = 'edit'
 }
@@ -1733,12 +1793,14 @@ function saveRow() {
     const image = String(editDraft.image ?? '').trim()
     const name = String(editDraft.name ?? '').trim()
     const description = String(editDraft.description ?? '').trim()
+    const nameEn = String(editDraft.nameEn ?? '').trim()
+    const descriptionEn = String(editDraft.descriptionEn ?? '').trim()
     const grade = String(editDraft.grade ?? '').trim()
     const seats = Number(editDraft.seats)
     const largeLuggage = Number(editDraft.largeLuggageCapacity)
     const smallLuggage = Number(editDraft.smallLuggageCapacity)
-    if (!image || !name || !description || !grade) {
-      appStore.notify('车型校验未通过', '车型图片、车型名称、车型描述和车型等级均为必填项。', 'danger')
+    if (!image || !name || !description || !nameEn || !descriptionEn || !grade) {
+      appStore.notify('车型校验未通过', '车型图片、中英文名称、中英文描述和车型等级均为必填项。', 'danger')
       return
     }
     if (!vehicleGradeOptions.includes(grade)) {
@@ -1762,6 +1824,8 @@ function saveRow() {
       image,
       name,
       description,
+      nameEn,
+      descriptionEn,
       grade,
       seats,
       passengerCapacity: seats - 1,
@@ -1782,6 +1846,12 @@ function saveRow() {
       appStore.notify('包车路线校验未通过', `${missingField[1]}为必填项，请补充后再保存。`, 'danger')
       return
     }
+    const localizedRequired: Array<[string, string]> = [['nameEn', '英文路线名称'], ['introEn', '英文路线介绍'], ['descriptionEn', '英文路线描述']]
+    const missingLocalized = localizedRequired.find(([key]) => !String(editDraft[key] ?? '').trim())
+    if (missingLocalized) {
+      appStore.notify('包车路线校验未通过', `${missingLocalized[1]}为必填项，请补充后再保存。`, 'danger')
+      return
+    }
     // `input[type=number]` 的 v-model 在运行时可能返回 number，先统一转成字符串再校验。
     const amountDraft = String(editDraft.referenceAmount ?? '').trim()
     const amount = Number(amountDraft)
@@ -1795,7 +1865,13 @@ function saveRow() {
       appStore.notify('排序校验未通过', '排序必须是大于或等于 0 的整数。', 'danger')
       return
     }
-    Object.assign(values, { referenceAmount: amount, sort })
+    Object.assign(values, {
+      nameEn: String(editDraft.nameEn).trim(),
+      introEn: String(editDraft.introEn).trim(),
+      descriptionEn: String(editDraft.descriptionEn).trim(),
+      referenceAmount: amount,
+      sort,
+    })
   }
   if (section.value === 'geofences') {
     const vertexCount = Number(values.vertexCount)
@@ -3123,11 +3199,12 @@ function saveSettings() {
         </svg>
         <div class="geofence-detail-map__relation"><StatusBadge :label="String(selectedRow.geometryRelation ?? '正常')" :tone="String(selectedRow.geometryRelation ?? '').includes('交叠') ? 'warning' : 'info'" dot /><span v-if="selectedRow.relatedFence">关联围栏：{{ selectedRow.relatedFence }}</span><span v-else>未检测到与其他围栏相交</span></div>
       </section>
+      <ContentLanguageTabs v-if="section === 'vehicle-types'" v-model="detailContentLanguage" compact />
       <div class="detail-grid">
         <div v-for="column in visibleColumns" :key="column.key">
           <template v-if="column.kind === 'image'"><span>{{ column.label }}</span><img class="detail-vehicle-image" :src="String(selectedRow[column.key] ?? '')" :alt="`${String(selectedRow.name ?? '车型')}图片`" /></template>
           <template v-else-if="column.kind === 'status'"><span>{{ column.label }}</span><StatusBadge :label="formatCell(selectedRow[column.key], column)" :tone="statusTone(selectedRow[column.key])" dot /></template>
-          <template v-else><span>{{ column.label }}</span><strong>{{ formatCell(selectedRow[column.key], column) }}</strong></template>
+          <template v-else><span>{{ isGenericLocalizedColumn(column) ? `${column.label}（${detailContentLanguage === 'zh' ? '中文' : 'English'}）` : column.label }}</span><strong>{{ localizedDetailValue(selectedRow, column) }}</strong></template>
         </div>
       </div>
       <section class="detail-note"><Sparkles :size="16" /><div><strong>业务操作提示</strong><p>{{ config.insight.description }}</p></div></section>
@@ -3212,9 +3289,11 @@ function saveSettings() {
     />
 
     <ModalDialog v-else-if="editMode" :title="editMode === 'create' ? `新增${pageMeta.title}` : `编辑${pageMeta.title}`" eyebrow="FORM EDITOR" :size="section === 'charter-routes' ? 'wide' : 'default'" @close="closeEditor">
+      <ContentLanguageTabs v-if="['vehicle-types', 'charter-routes'].includes(section)" v-model="genericContentLanguage" />
       <div class="editor-grid">
-        <label v-for="column in draftColumns" :key="column.key" class="editor-field" :class="{ 'editor-field--wide': section === 'vehicle-types' && ['image', 'description'].includes(column.key) }">
-          <span>{{ column.label }}<em v-if="isDraftFieldRequired(column)" class="required-mark" aria-hidden="true"> *</em></span>
+        <template v-for="column in draftColumns" :key="column.key">
+        <label class="editor-field" :class="{ 'editor-field--wide': section === 'vehicle-types' && ['image', 'description'].includes(column.key) }">
+          <span>{{ genericEditorLabel(column) }}<em v-if="isDraftFieldRequired(column)" class="required-mark" aria-hidden="true"> *</em></span>
           <span v-if="section === 'vehicle-types' && column.key === 'image'" class="vehicle-image-uploader">
             <img v-if="editDraft.image" :src="editDraft.image" alt="车型图片预览" />
             <span v-else class="vehicle-image-uploader__empty"><ImagePlus :size="22" /><b>上传车型图片</b><small>支持 JPG、PNG、WebP，文件不超过 3 MB</small></span>
@@ -3222,15 +3301,15 @@ function saveSettings() {
             <input type="file" accept="image/*" @change="handleVehicleImageUpload" />
           </span>
           <select v-else-if="optionsForColumn(column).length" v-model="editDraft[column.key]" class="field-control"><option v-for="option in optionsForColumn(column)" :key="option" :value="option">{{ option }}</option></select>
-          <textarea v-else-if="section === 'vehicle-types' && column.key === 'description'" v-model="editDraft[column.key]" class="form-textarea" maxlength="200" placeholder="请输入车型定位、适用场景或乘坐体验说明"></textarea>
+          <textarea v-else-if="isGenericLocalizedColumn(column) && ['intro', 'description'].includes(column.key)" v-model="editDraft[genericLocalizedDraftKey(column)]" class="form-textarea" :maxlength="section === 'vehicle-types' ? 200 : undefined" :placeholder="genericEditorPlaceholder(column)"></textarea>
           <input v-else-if="section === 'vehicle-types' && column.key !== 'name'" v-model="editDraft[column.key]" class="field-control" type="number" :min="column.key === 'seats' ? 2 : 0" :max="column.key === 'seats' ? 20 : 30" step="1" :placeholder="`请输入${column.label}`" />
           <div v-else-if="column.kind === 'currency'" class="editor-money-field">
             <b>£</b><input v-model="editDraft[column.key]" type="number" step="0.01" :min="isDraftFieldRequired(column) ? '0.01' : undefined" :required="isDraftFieldRequired(column)" :aria-required="isDraftFieldRequired(column)" :placeholder="`请输入${column.label}`" />
           </div>
-          <textarea v-else-if="section === 'charter-routes' && ['intro', 'description'].includes(column.key)" v-model="editDraft[column.key]" class="form-textarea" :placeholder="`请输入${column.label}`"></textarea>
           <input v-else-if="section === 'charter-routes' && column.key === 'sort'" v-model="editDraft[column.key]" class="field-control" type="number" min="0" step="1" placeholder="请输入排序值" />
-          <input v-else v-model="editDraft[column.key]" class="field-control" type="text" :placeholder="`请输入${column.label}`" />
+          <input v-else v-model="editDraft[genericLocalizedDraftKey(column)]" class="field-control" type="text" :placeholder="genericEditorPlaceholder(column)" />
         </label>
+        </template>
       </div>
       <p class="editor-tip">{{ section === 'charter-routes' ? '参考金额为必填项，单位为英镑；仅用于乘客端页面展示，不参与定价、支付、订单或分账。' : section === 'vehicle-types' ? '车型图片、名称、描述与等级均为必填项；座位数包含司机位，可载乘客数由系统自动计算为“座位数 − 1”。容量修改仅影响新订单。' : '保存后将立即更新当前原型列表，并通过消息提示反馈操作结果。' }}</p>
       <template #footer>

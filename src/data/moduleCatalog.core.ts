@@ -209,10 +209,10 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
       { key: 'status', label: '状态', kind: 'status', width: '94px' },
     ],
     rows: [
-      { id: 'VT-001', image: vehicleImage('ECONOMY 5', '#2d6398'), name: '经济5座', description: '适合日常接送机与短途出行，兼顾乘坐空间和经济性。', grade: '经济型', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 3, routeCount: 12, updatedAt: '2026-08-12 11:20', status: '启用' },
-      { id: 'VT-002', image: vehicleImage('LUXURY 5', '#bc7a24'), name: '豪华5座', description: '面向高品质出行场景，提供更舒适的乘坐体验与内饰配置。', grade: '豪华型', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 4, routeCount: 8, updatedAt: '2026-08-10 16:45', status: '启用' },
-      { id: 'VT-003', image: vehicleImage('ECONOMY 7', '#3e7d68'), name: '经济7座', description: '适合多人同行与家庭出行，提供更充足的乘客及行李容量。', grade: '经济型', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 3, smallLuggageCapacity: 6, routeCount: 15, updatedAt: '2026-08-15 09:08', status: '启用' },
-      { id: 'VT-004', image: vehicleImage('COMFORT 7', '#695c8f'), name: '商务7座', description: '适合商务接待与团队出行，强调空间、舒适度与装载能力。', grade: '舒适型', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 4, smallLuggageCapacity: 7, routeCount: 10, updatedAt: '2026-08-07 14:32', status: '禁用' },
+      { id: 'VT-001', image: vehicleImage('ECONOMY 5', '#2d6398'), name: '经济5座', nameEn: 'Economy 5 Seater', description: '适合日常接送机与短途出行，兼顾乘坐空间和经济性。', descriptionEn: 'A practical and affordable choice for airport transfers and short journeys.', grade: '经济型', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 3, routeCount: 12, updatedAt: '2026-08-12 11:20', status: '启用' },
+      { id: 'VT-002', image: vehicleImage('LUXURY 5', '#bc7a24'), name: '豪华5座', nameEn: 'Luxury 5 Seater', description: '面向高品质出行场景，提供更舒适的乘坐体验与内饰配置。', descriptionEn: 'A premium vehicle with refined comfort for executive and high-quality travel.', grade: '豪华型', seats: 5, passengerCapacity: 4, largeLuggageCapacity: 2, smallLuggageCapacity: 4, routeCount: 8, updatedAt: '2026-08-10 16:45', status: '启用' },
+      { id: 'VT-003', image: vehicleImage('ECONOMY 7', '#3e7d68'), name: '经济7座', nameEn: 'Economy 7 Seater', description: '适合多人同行与家庭出行，提供更充足的乘客及行李容量。', descriptionEn: 'Extra passenger and luggage space for families and larger groups.', grade: '经济型', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 3, smallLuggageCapacity: 6, routeCount: 15, updatedAt: '2026-08-15 09:08', status: '启用' },
+      { id: 'VT-004', image: vehicleImage('COMFORT 7', '#695c8f'), name: '商务7座', nameEn: 'Executive 7 Seater', description: '适合商务接待与团队出行，强调空间、舒适度与装载能力。', descriptionEn: 'Spacious executive transport for business reception and group travel.', grade: '舒适型', seats: 7, passengerCapacity: 6, largeLuggageCapacity: 4, smallLuggageCapacity: 7, routeCount: 10, updatedAt: '2026-08-07 14:32', status: '禁用' },
     ],
     primaryAction: '新增车型',
     secondaryAction: '查看配置依赖',
@@ -511,3 +511,19 @@ export const coreModuleCatalog: Record<string, ModuleCatalogEntry> = {
     canEdit: true,
   },
 }
+
+const coreLocalizedContent: Record<string, Record<string, string>> = {
+  'RT-LHR-Z1': { nameEn: 'Heathrow Airport → Central London' },
+  'RT-Z1-LGW': { nameEn: 'Central London → Gatwick Airport' },
+  'RT-LHR-CBG': { nameEn: 'Heathrow Airport → Cambridge' },
+  'RT-MAN-CTR': { nameEn: 'Manchester Airport → City Centre' },
+  'RT-BHX-COV': { nameEn: 'Birmingham Airport → Coventry' },
+  'CR-001': { nameEn: 'London – Oxford – Bicester Day Tour', introEn: 'Universities, heritage and shopping', descriptionEn: 'Depart London, explore the heart of Oxford University, then continue to Bicester Village.' },
+  'CR-002': { nameEn: 'Classic Cotswolds Tour from London', introEn: 'A deeper journey through the English countryside', descriptionEn: 'Visit Bourton-on-the-Water, Bibury and a country estate, with flexible stop durations.' },
+  'CR-003': { nameEn: 'Edinburgh – Scottish Highlands', introEn: 'Castles, valleys and Highland scenery', descriptionEn: 'Depart Edinburgh via Stirling and Glencoe for a scenic journey into the Highlands.' },
+  'CR-004': { nameEn: 'Manchester – Lake District', introEn: 'A custom tour around Windermere', descriptionEn: 'Visit Windermere and Ambleside with custom stops for families or photography.' },
+}
+
+Object.values(coreModuleCatalog).forEach((module) => {
+  module.rows?.forEach((row) => Object.assign(row, coreLocalizedContent[row.id] ?? {}))
+})
