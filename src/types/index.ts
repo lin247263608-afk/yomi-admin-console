@@ -84,7 +84,8 @@ export interface CarpoolDemand {
   departureAt: string
   orderedAt: string
   paymentStatus: PaymentStatus
-  depositPence: number
+  /** 路线定金单价（便士/人）；订单实际定金按乘车人数计算。 */
+  depositUnitPence: number
   groupCount: number
   groupTarget: number
   status: CarpoolStatus
@@ -211,7 +212,15 @@ export interface Order {
   fees: {
     tripPence: number
     exitDepositPence?: number
+    /** 下单时锁定的路线定金单价（便士/人）。 */
+    depositUnitPence?: number
+    /** 本单定金计费人数。 */
+    depositPassengerCount?: number
     depositPence: number
+    /** 价格锁定后仍需收取的尾款；定金覆盖应付时为 0。 */
+    balancePence?: number
+    /** 已付定金高于订单应付时自动退还的差额。 */
+    depositRefundPence?: number
     addOnPence: number
     couponPence: number
     commissionPence: number

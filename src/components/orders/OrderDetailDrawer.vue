@@ -206,7 +206,12 @@ function changeMapZoom(delta: number) {
         <div class="detail-block__heading"><h3>费用构成</h3><span class="muted">GBP</span></div>
         <div class="fee-list">
           <div><span>行程费</span><strong>{{ formatCurrency(order.fees.tripPence) }}</strong></div>
-          <div><span>乘客定金</span><strong>{{ formatCurrency(order.fees.depositPence) }}</strong></div>
+          <div>
+            <span>乘客定金<template v-if="order.fees.depositUnitPence !== undefined && order.fees.depositPassengerCount !== undefined">（{{ formatCurrency(order.fees.depositUnitPence) }}/人 × {{ order.fees.depositPassengerCount }} 人）</template></span>
+            <strong>{{ formatCurrency(order.fees.depositPence) }}</strong>
+          </div>
+          <div v-if="order.serviceType === '拼车'"><span>待付尾款</span><strong>{{ formatCurrency(order.fees.balancePence ?? Math.max(0, order.amountPence - order.fees.depositPence)) }}</strong></div>
+          <div v-if="(order.fees.depositRefundPence ?? 0) > 0"><span>定金自动退差额</span><strong>−{{ formatCurrency(order.fees.depositRefundPence ?? 0) }}</strong></div>
           <div><span>增值服务费（计入分账）</span><strong>{{ formatCurrency(order.fees.addOnPence) }}</strong></div>
           <div><span>优惠券抵扣（平台承担）</span><strong>−{{ formatCurrency(order.fees.couponPence) }}</strong></div>
           <div><span>平台抽佣 · {{ order.commissionRate ?? '—' }}%（{{ order.commissionSource ?? '待锁定' }}）</span><strong>−{{ formatCurrency(order.fees.commissionPence) }}</strong></div>

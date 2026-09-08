@@ -89,10 +89,40 @@ export function lockOrderPrice(order: Order, driver: DriverCandidate) {
   order.fees.commissionPence = commissionPence
   order.fees.driverPence = driverPence
   order.amountPence = Math.max(0, tripPence + order.fees.addOnPence - order.fees.couponPence)
+  const rawBalancePence = order.amountPence - order.fees.depositPence
+  order.fees.balancePence = Math.max(0, rawBalancePence)
+  order.fees.depositRefundPence = Math.max(0, -rawBalancePence)
+
+  if (rawBalancePence <= 0) {
+    order.passengers.forEach((passenger) => {
+      passenger.paymentStatus = '已付尾款'
+    })
+  }
+  if (rawBalancePence < 0) {
+    order.refundStatus = '退款处理中'
+    order.refundRecord = {
+      amountPence: -rawBalancePence,
+      status: '退款处理中',
+      createdAt: new Date().toISOString(),
+      fullRefund: false,
+      includesValueAddedServices: false,
+    }
+    order.notes.unshift({
+      id: `N-DEPOSIT-REFUND-${Date.now()}`,
+      author: '系统',
+      content: `已付定金总额高于订单应付，已自动发起 Stripe 退差额 £${(-rawBalancePence / 100).toFixed(2)}。`,
+      createdAt: new Date().toISOString(),
+    })
+  }
   order.commissionRate = Math.round(commissionRate * 100)
   order.commissionSource = order.commissionSource ?? '路线常规'
   order.settlementPence = driverPence
   order.priceStatus = hoursUntil(order.departureAt) < 48 ? '封板' : '可变'
 
-  return { recalculated: true, priceStatus: order.priceStatus }
+  return {
+    recalculated: true,
+    priceStatus: order.priceStatus,
+    balancePence: order.fees.balancePence,
+    depositRefundPence: order.fees.depositRefundPence,
+  }
 }

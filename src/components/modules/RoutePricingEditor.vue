@@ -52,17 +52,26 @@ const specialPeriods = reactive<SpecialPeriod[]>(readSpecialPeriods(source))
 const errorMessage = ref('')
 const contentLanguage = ref<ContentLanguage>('zh')
 const lowestFullGroupSeatPrice = computed(() => {
+  const passengerCount = businessConfig.autoGroupPassengers
+  if (passengerCount <= 0) return null
   const prices = vehiclePricing
-    .map((item) => Number(item.baseFare))
-    .filter((price) => Number.isFinite(price) && price > 0)
-  if (!prices.length || businessConfig.autoGroupPassengers <= 0) return null
-  return Math.min(...prices) / businessConfig.autoGroupPassengers
+    .map((item) => {
+      const baseFare = Number(item.baseFare)
+      const extraSeat = Number(item.extraSeat)
+      if (!Number.isFinite(baseFare) || baseFare <= 0 || !Number.isFinite(extraSeat) || extraSeat < 0) return null
+      const fullGroupFare = baseFare + extraSeat * Math.max(0, passengerCount - 1)
+      return fullGroupFare / passengerCount
+    })
+    .filter((price): price is number => price !== null)
+  return prices.length ? Math.min(...prices) : null
 })
 const depositWarning = computed(() => {
-  const deposit = Number(draft.deposit)
+  const depositUnit = Number(draft.deposit)
+  const passengerCount = businessConfig.autoGroupPassengers
   const lowestSeat = lowestFullGroupSeatPrice.value
-  if (!Number.isFinite(deposit) || lowestSeat === null || deposit <= lowestSeat) return ''
-  return `路线定金 £${deposit.toFixed(2)} 高于满团时最低单座价 £${lowestSeat.toFixed(2)}，可能频繁触发尾款退差额。此项仅警示，不阻止保存。`
+  const maximumDeposit = depositUnit * passengerCount
+  if (!Number.isFinite(depositUnit) || lowestSeat === null || maximumDeposit <= lowestSeat) return ''
+  return `定金合理性提示：£${depositUnit.toFixed(2)}/人 × 最大 ${passengerCount} 人 = £${maximumDeposit.toFixed(2)}，高于该路线满团时最低单座价 £${lowestSeat.toFixed(2)}，可能触发尾款自动退差额。此项仅警示，不阻止保存。`
 })
 
 function readVehiclePricing(row: ModuleRow): VehiclePriceDraft[] {
@@ -135,7 +144,7 @@ function save() {
   const duration = Number(draft.duration)
   if (!Number.isFinite(duration) || duration <= 0) return void (errorMessage.value = '预计时长必须是大于 0 的分钟数。')
   const deposit = Number(draft.deposit)
-  if (!Number.isFinite(deposit) || deposit < 0) return void (errorMessage.value = '路线定金必须是大于或等于 0 的金额。')
+  if (!Number.isFinite(deposit) || deposit <= 0) return void (errorMessage.value = '路线定金单价必须是大于 0 的金额。')
   if (!vehiclePricing.length || vehiclePricing.some((item) => !item.vehicleId || !activeVehicles.value.some((vehicle) => vehicle.id === item.vehicleId))) {
     return void (errorMessage.value = '至少配置一条启用车型定价。')
   }
@@ -210,9 +219,9 @@ function save() {
       <label><span>距离（km）</span><input v-model="draft.distance" class="field-control" type="number" min="0.1" step="0.1" placeholder="如 29" /></label>
       <label><span>预计时长（分钟）</span><input v-model="draft.duration" class="field-control" type="number" min="1" step="1" placeholder="如 55" /></label>
       <label><span>常规抽佣（0–100%）</span><input v-model="draft.commissionRate" class="field-control" type="number" min="0" max="100" /></label>
-      <label><span>路线定金（£）</span><input v-model="draft.deposit" class="field-control" type="number" min="0" step="0.01" /></label>
+      <label><span>路线定金单价（£/人）</span><input v-model="draft.deposit" class="field-control" type="number" min="0.01" step="0.01" placeholder="如 5.00" /></label>
     </div>
-    <p class="route-editor-hint">新增路线默认启用且不标记为热门；请在列表操作栏中调整启停与热门状态。
+    <p class="route-editor-hint">拼车下单应付定金 = 路线定金单价 × 乘车人数。新增路线默认启用且不标记为热门；请在列表操作栏中调整启停与热门状态。
     </p>
 
     <section class="route-editor-section">

@@ -10,7 +10,7 @@ import DrawerShell from '@/components/overlay/DrawerShell.vue'
 import { carpoolDemands, orders } from '@/data/mock'
 import { useAppStore } from '@/stores/app'
 import type { CarpoolDemand, CarpoolStatus, Order } from '@/types'
-import { formatLuggage, formatLondonTime, formatParty, timeUntil } from '@/utils/format'
+import { formatCurrency, formatLuggage, formatLondonTime, formatParty, timeUntil } from '@/utils/format'
 
 const appStore = useAppStore()
 // Mock 数组在当前 SPA 会话中充当原型业务仓，保证跨路由操作结果可继续观察。
@@ -111,6 +111,10 @@ function statusTone(status: CarpoolStatus) {
   return 'neutral' as const
 }
 
+function demandDepositTotalPence(demand: CarpoolDemand) {
+  return demand.depositUnitPence * demand.groupCount
+}
+
 function openDetail(row: CarpoolDemand) {
   selectedDemand.value = row
 }
@@ -178,8 +182,10 @@ function createOrderFromDemand(demand: CarpoolDemand): Order {
     })),
     fees: {
       tripPence: 0,
-      // 路线定金按每个下单组收取；同一组可包含多名同行乘客，但只计一份定金。
-      depositPence: demand.depositPence * demand.members.length,
+      // v1.2：定金按实际乘车人数收取，不再按路线或下单组固定收取。
+      depositUnitPence: demand.depositUnitPence,
+      depositPassengerCount: adults + children,
+      depositPence: demand.depositUnitPence * (adults + children),
       addOnPence,
       couponPence: 0,
       commissionPence: 0,
@@ -380,6 +386,7 @@ function saveShareConfig() {
         <div class="drawer-summary__status"><span>拼团状态</span><StatusBadge :label="selectedDemand.status" :tone="statusTone(selectedDemand.status)" dot /></div>
         <div><span>拼团人数</span><strong>{{ selectedDemand.groupCount }} / {{ selectedDemand.groupTarget }}</strong></div>
         <div><span>预计出发</span><strong>{{ formatLondonTime(selectedDemand.departureAt) }}</strong></div>
+        <div><span>已付定金</span><strong>{{ formatCurrency(demandDepositTotalPence(selectedDemand)) }}</strong></div>
       </div>
       <div v-if="selectedDemand.generatedOrderId" class="workflow-notice workflow-notice--success"><strong>已生成派单订单</strong><span class="mono">{{ selectedDemand.generatedOrderId }}</span><p>价格仍为未定，待司机确认车型后首次锁定。</p></div>
       <div v-if="selectedDemand.cancellation" class="workflow-notice workflow-notice--danger"><strong>平台取消处理</strong><p>{{ selectedDemand.cancellation.reason }}</p><div><StatusBadge :label="selectedDemand.cancellation.refundStatus" tone="warning" /><StatusBadge :label="selectedDemand.cancellation.notificationStatus" tone="info" /></div></div>
@@ -397,6 +404,8 @@ function saveShareConfig() {
           <div><span>手机号</span><strong>{{ selectedDemand.phone }}</strong></div>
           <div><span>邮箱</span><strong>{{ selectedDemand.email }}</strong></div>
           <div><span>人数</span><strong>{{ formatParty(selectedDemand) }}</strong></div>
+          <div><span>定金单价</span><strong>{{ formatCurrency(selectedDemand.depositUnitPence) }} / 人</strong></div>
+          <div><span>定金计算</span><strong>{{ formatCurrency(selectedDemand.depositUnitPence) }} × {{ selectedDemand.groupCount }} 人 = {{ formatCurrency(demandDepositTotalPence(selectedDemand)) }}</strong></div>
           <div><span>行李</span><strong>{{ formatLuggage(selectedDemand) }}</strong></div>
           <div><span>下单时间</span><strong>{{ formatLondonTime(selectedDemand.orderedAt) }}</strong></div>
           <div><span>出发时间</span><strong>{{ formatLondonTime(selectedDemand.departureAt) }}</strong></div>
@@ -573,7 +582,7 @@ function saveShareConfig() {
 
 .drawer-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 14px;
   margin-bottom: 22px;
   border: 1px solid var(--border);

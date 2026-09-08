@@ -1974,7 +1974,7 @@ function saveRoute(row: ModuleRow, warnings: string[]) {
   }
   if (config.value) config.value.rows = rows.value.map((item) => ({ ...item }))
   closeEditor()
-  if (warnings.length) appStore.notify('路线已保存 · 请复核定金', warnings.join('；'), 'warning')
+  if (warnings.length) appStore.notify('路线已保存 · 请复核定金单价', warnings.join('；'), 'warning')
   else appStore.notify(existingIndex >= 0 ? '路线配置已更新' : '路线配置已创建', `${row.name ?? row.id} 已写入当前原型列表。`, 'success')
 }
 

@@ -94,7 +94,7 @@ function statusTone(value: unknown): BadgeTone {
         <div><span>距离</span><strong>{{ row.distance ?? '—' }}</strong></div>
         <div><span>预计时长</span><strong>{{ row.duration ?? '—' }}</strong></div>
         <div><span>常规抽佣</span><strong>{{ row.commissionRate ?? '—' }}</strong></div>
-        <div><span>路线定金</span><strong>{{ money(row.deposit) }}</strong></div>
+        <div><span>路线定金单价</span><strong>{{ money(row.deposit) }} / 人</strong></div>
       </div>
     </section>
 
